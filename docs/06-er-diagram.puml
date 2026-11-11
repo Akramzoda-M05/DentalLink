@@ -1,0 +1,160 @@
+@startuml 06-er-diagram
+title DentalLink: логическая модель базы данных (ER, 3НФ)
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam classFontSize 12
+skinparam classFontName "Segoe UI", Arial, sans-serif
+
+entity users {
+  * id : BIGINT <<PK>>
+  --
+  * full_name : VARCHAR(120)
+  * email : VARCHAR(120) <<UQ>>
+  * password_hash : VARCHAR(255)
+  * phone : VARCHAR(20) <<UQ>>
+  * role : VARCHAR(20) /* admin, receptionist, doctor */
+  * is_active : BOOLEAN
+  * created_at : TIMESTAMP
+  * updated_at : TIMESTAMP
+}
+
+entity doctors {
+  * id : BIGINT <<PK>>
+  --
+  * user_id : BIGINT <<FK, UQ>>
+  * specialization : VARCHAR(30) /* dentist, therapist, surgeon, etc. */
+  qualification : VARCHAR(100)
+  * experience_years : INT
+  bio : TEXT
+  avatar_url : VARCHAR(255)
+  * is_active : BOOLEAN
+  * created_at : TIMESTAMP
+}
+
+entity cabinets {
+  * id : BIGINT <<PK>>
+  --
+  * name : VARCHAR(50) <<UQ>>
+  * chair_number : INT
+  description : VARCHAR(255)
+  * is_available : BOOLEAN
+}
+
+entity service_categories {
+  * id : BIGINT <<PK>>
+  --
+  * name : VARCHAR(100) <<UQ>>
+  description : VARCHAR(255)
+  * sort_order : INT
+}
+
+entity dental_services {
+  * id : BIGINT <<PK>>
+  --
+  * category_id : BIGINT <<FK>>
+  * name : VARCHAR(150)
+  description : TEXT
+  * price : NUMERIC(10,2)
+  * duration_minutes : INT
+  * is_active : BOOLEAN
+  * created_at : TIMESTAMP
+}
+
+entity doctor_schedules {
+  * id : BIGINT <<PK>>
+  --
+  * doctor_id : BIGINT <<FK>>
+  * cabinet_id : BIGINT <<FK>>
+  * work_date : DATE
+  * start_time : TIME
+  * end_time : TIME
+  * created_at : TIMESTAMP
+}
+
+entity time_slots {
+  * id : BIGINT <<PK>>
+  --
+  * schedule_id : BIGINT <<FK>>
+  * doctor_id : BIGINT <<FK>>
+  * cabinet_id : BIGINT <<FK>>
+  * slot_date : DATE
+  * start_time : TIME
+  * end_time : TIME
+  * status : VARCHAR(20) /* free, reserved, booked */
+  reserved_until : TIMESTAMP
+}
+
+entity patients {
+  * id : BIGINT <<PK>>
+  --
+  * full_name : VARCHAR(120)
+  * phone : VARCHAR(20) <<UQ>>
+  email : VARCHAR(120)
+  birth_date : DATE
+  telegram_chat_id : BIGINT <<UQ>>
+  notes : TEXT
+  * created_at : TIMESTAMP
+}
+
+entity appointments {
+  * id : BIGINT <<PK>>
+  --
+  * appointment_number : VARCHAR(32) <<UQ>>
+  * patient_id : BIGINT <<FK>>
+  * doctor_id : BIGINT <<FK>>
+  * slot_id : BIGINT <<FK, UQ>>
+  * cabinet_id : BIGINT <<FK>>
+  created_by_user_id : BIGINT <<FK>>
+  * status : VARCHAR(20) /* confirmed, arrived, in_progress, completed, cancelled, no_show */
+  patient_complaint : TEXT
+  doctor_notes : TEXT
+  * is_confirmed_by_patient : BOOLEAN
+  * created_at : TIMESTAMP
+  * updated_at : TIMESTAMP
+}
+
+entity appointment_services {
+  * id : BIGINT <<PK>>
+  --
+  * appointment_id : BIGINT <<FK>>
+  * service_id : BIGINT <<FK>>
+  * quantity : INT
+  * price_at_booking : NUMERIC(10,2)
+}
+
+entity notifications {
+  * id : BIGINT <<PK>>
+  --
+  * appointment_id : BIGINT <<FK>>
+  * telegram_chat_id : BIGINT
+  * type : VARCHAR(30) /* confirmation, reminder_24h, reminder_2h, cancellation */
+  * status : VARCHAR(20) /* pending, sent, failed */
+  * scheduled_at : TIMESTAMP
+  sent_at : TIMESTAMP
+  response_payload : TEXT
+}
+
+' Связи между сущностями (Нотация Crow's Foot)
+users ||--o| doctors : "user_id"
+doctors ||--o{ doctor_schedules : "doctor_id"
+cabinets ||--o{ doctor_schedules : "cabinet_id"
+doctor_schedules ||--|{ time_slots : "schedule_id"
+doctors ||--o{ time_slots : "doctor_id"
+cabinets ||--o{ time_slots : "cabinet_id"
+
+service_categories ||--o{ dental_services : "category_id"
+
+patients ||--o{ appointments : "patient_id"
+doctors ||--o{ appointments : "doctor_id"
+cabinets ||--o{ appointments : "cabinet_id"
+time_slots ||--o| appointments : "slot_id"
+users |o--o{ appointments : "created_by_user_id"
+
+appointments ||--|{ appointment_services : "appointment_id"
+dental_services ||--o{ appointment_services : "service_id"
+
+appointments ||--o{ notifications : "appointment_id"
+
+@enduml
