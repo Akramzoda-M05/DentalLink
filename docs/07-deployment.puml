@@ -1,0 +1,140 @@
+@startuml 07-deployment
+title DentalLink: Диаграмма развёртывания (UML Deployment Diagram)
+
+skinparam componentStyle uml2
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam defaultFontName "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam nodesep 50
+skinparam ranksep 50
+
+skinparam node {
+  BackgroundColor #F8FAFC
+  BorderColor #475569
+  FontSize 13
+  FontStyle bold
+}
+
+skinparam database {
+  BackgroundColor #EFF6FF
+  BorderColor #2563EB
+}
+
+skinparam cloud {
+  BackgroundColor #F0FDF4
+  BorderColor #16A34A
+}
+
+' ==============================================================================
+' УЗЕЛ 1: Клиентские устройства
+' ==============================================================================
+node "Клиентское рабочее место (Client Device)\n[Desktop / Tablet / Smartphone]" as ClientNode {
+  node "Веб-браузер (Web Browser)\n[Chrome, Firefox, Safari, Edge]" as BrowserNode {
+    artifact "React SPA (Пациент)\n- Каталог услуг\n- Выбор слотов\n- Быстрая запись" as PatientSPA
+    artifact "React SPA (Персонал)\n- Интерактивный Timeline\n- Управление статусами\n- График смен" as StaffSPA
+  }
+  node "Telegram Messenger App\n[Desktop / Mobile iOS & Android]" as TelegramApp {
+    artifact "Чат-бот @DentalLuxBot\n- Напоминания за 24 ч и 2 ч\n- Кнопки подтверждения/отмены" as TelegramClientUI
+  }
+}
+
+' ==============================================================================
+' УЗЕЛ 2: Периметр сети и обратный прокси (DMZ / Edge Server)
+' ==============================================================================
+node "Сервер периметра сети (Edge Server / DMZ)\n[Ubuntu Linux 24.04 LTS]" as EdgeNode {
+  node "Nginx 1.26 (Reverse Proxy & Web Server)" as NginxServer {
+    component "SSL/TLS Termination\n[Let's Encrypt / Certbot]" as SSLTerm
+    component "Static File Server\n[/var/www/dentallink/dist]\n(Gzip, Brotli, Cache-Control)" as StaticServer
+    component "Reverse Proxy & API Gateway\n(Rate Limiting, Upstream Balancing)" as ProxyPass
+    component "Security Firewall\n(CORS, XSS-Protection, HSTS)" as SecHeaders
+  }
+}
+
+' ==============================================================================
+' УЗЕЛ 3: Сервер приложений (Application Server / Docker Host)
+' ==============================================================================
+node "Сервер приложений (App Host / Docker Engine)\n[Isolated Docker Network: dentallink_net]" as AppHost {
+  
+  node "Docker Container: backend-api\n[mcr.microsoft.com/dotnet/aspnet:10.0]" as BackendContainer {
+    component "ASP.NET Core 10 Web API\n(Kestrel Web Server)" as KestrelServer {
+      component "Presentation Layer\n(REST Controllers, Auth JWT)" as ApiLayer
+      component "Application Layer\n(MediatR, Use Cases, FluentValidation)" as AppLayer
+      component "Domain Layer\n(Entities, Business Rules, Enums)" as DomainLayer
+      component "Infrastructure Layer\n(EF Core Npgsql, Redis Service)" as InfraLayer
+    }
+  }
+
+  node "Docker Container: background-worker\n[mcr.microsoft.com/dotnet/runtime:10.0]" as WorkerContainer {
+    component "Hosted Service / Cron Worker\n(Quartz.NET / BackgroundService)\n- Проверка напоминаний каждую минуту\n- Отправка уведомлений в Telegram" as ReminderWorker
+  }
+}
+
+' ==============================================================================
+' УЗЕЛ 4: Сервер баз данных и кэширования (Data Tier)
+' ==============================================================================
+node "Сервер хранения данных (Database Tier / Docker Network)\n[Data Volumes: pg_data, redis_data]" as DbHost {
+
+  database "Docker Container: postgres-db\n[PostgreSQL 18.6 Alpine]" as PostgresNode {
+    database "База данных: dentallink_db\n(Реляционное хранилище, UTF-8)" as PostgresDb {
+      frame "Таблицы Lab 6/7:\n- users, doctors, cabinets\n- service_categories, dental_services\n- doctor_schedules, time_slots\n- patients, appointments\n- appointment_services, notifications" as Tables
+      frame "Ограничения & Индексы:\n- 10+ FK (RESTRICT, CASCADE)\n- 10 UNIQUE, 12 CHECK\n- B-Tree индексы поиска" as DbIndexes
+    }
+  }
+
+  database "Docker Container: redis-cache\n[Redis 7.2 Alpine]" as RedisNode {
+    component "Redis In-Memory Store\n- Distributed Lock (RedLock)\n- Временное удержание слота (TTL 10 мин)\n- Кэш каталога услуг" as RedisStore
+  }
+}
+
+' ==============================================================================
+' ВНЕШНИЕ СЕРВИСЫ (External Cloud)
+' ==============================================================================
+cloud "Внешние облачные сервисы (External Cloud)" as ExternalCloud {
+  node "Telegram Cloud Infrastructure" as TelegramCloud {
+    component "Telegram Bot API\n[api.telegram.org:443]" as TelegramApiServer
+  }
+}
+
+' ==============================================================================
+' СЕТЕВЫЕ СВЯЗИ, ПРОТОКОЛЫ И ПОРТЫ
+' ==============================================================================
+
+' Клиент -> Nginx
+BrowserNode --> SSLTerm : "HTTPS (TLS 1.3 / TCP 443)\nHTTP (TCP 80 -> 301 Redirect)"
+SSLTerm --> StaticServer : "Локальное чтение\nстатических бандлов"
+StaticServer ..> PatientSPA : "Отдача HTML, JS, CSS"
+StaticServer ..> StaffSPA : "Отдача HTML, JS, CSS"
+
+' Nginx -> ASP.NET Core API
+ProxyPass --> KestrelServer : "HTTP/1.1 (TCP 5000)\nREST API / JSON\n[Internal Bridge]"
+
+' Бэкенд -> PostgreSQL
+InfraLayer --> PostgresDb : "TCP 5432 / Npgsql Provider\n(Connection Pooling, SSL)"
+
+' Бэкенд -> Redis
+InfraLayer --> RedisStore : "TCP 6379 / RESP Protocol\n(StackExchange.Redis)"
+
+' Фоновый воркер -> PostgreSQL & Telegram
+ReminderWorker --> PostgresDb : "TCP 5432 / Npgsql\n(Выборка scheduled notifications)"
+ReminderWorker --> TelegramApiServer : "HTTPS (TCP 443)\nREST API (POST /sendMessage)"
+
+' Интеграция Telegram Bot
+TelegramApiServer --> ProxyPass : "HTTPS (TCP 443)\nWebhook POST /api/v1/telegram/webhook"
+TelegramApiServer <.. TelegramClientUI : "MTProto (TCP 443 / 80)\nPush-уведомления и кнопки"
+
+' Примечание о топологии сети
+legend right
+  **Сетевая топология и безопасность:**
+  -- **Публичная зона (Internet / DMZ):**
+     * Порт 443 (HTTPS) - защищённый внешний веб-трафик и вебхуки Telegram
+     * Порт 80 (HTTP) - безусловный 301 редирект на HTTPS
+  -- **Изолированная сеть Docker (dentallink_net):**
+     * Порт 5000 (HTTP) - внутренний API шлюз Kestrel, закрыт от прямого доступа извне
+     * Порт 5432 (PostgreSQL) - доступен только для контейнеров бэкенда и воркера
+     * Порт 6379 (Redis) - доступен только бэкенду для блокировок и кэширования
+  -- **Внешние шлюзы:**
+     * Исходящий HTTPS:443 к api.telegram.org для оповещений пациентов
+endlegend
+
+@enduml
