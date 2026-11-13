@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="DentalLink.API/DentalLink.API.csproj" />
+  <Project Path="DentalLink.Application/DentalLink.Application.csproj" />
+  <Project Path="DentalLink.Domain/DentalLink.Domain.csproj" />
+  <Project Path="DentalLink.Infrastructure/DentalLink.Infrastructure.csproj" />
+</Solution>

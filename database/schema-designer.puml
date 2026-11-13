@@ -1,0 +1,168 @@
+@startuml 09-schema-designer
+title PostgreSQL 18.6 — Схема базы данных dentallink_db (Designer / ERD)
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam roundcorner 5
+skinparam classFontSize 11
+skinparam classFontName "Segoe UI", Arial, sans-serif
+
+skinparam class {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+  HeaderBackgroundColor #0F172A
+  HeaderFontColor #FFFFFF
+  FontColor #1E293B
+}
+
+entity "users\n(Персонал клиники)" as users {
+  * **id** : BIGINT <<PK>>
+  --
+  * full_name : VARCHAR(120)
+  * email : VARCHAR(120) <<UQ>>
+  * password_hash : VARCHAR(255)
+  * phone : VARCHAR(20) <<UQ>>
+  * role : VARCHAR(20) [admin, receptionist, doctor]
+  * is_active : BOOLEAN
+  * created_at : TIMESTAMPTZ
+  * updated_at : TIMESTAMPTZ
+}
+
+entity "doctors\n(Профили врачей)" as doctors {
+  * **id** : BIGINT <<PK>>
+  --
+  * user_id : BIGINT <<FK, UQ>> [ON DELETE RESTRICT]
+  * specialization : VARCHAR(30)
+  qualification : VARCHAR(100)
+  * experience_years : INT
+  bio : TEXT
+  avatar_url : VARCHAR(255)
+  * is_active : BOOLEAN
+  * created_at : TIMESTAMPTZ
+}
+
+entity "cabinets\n(Лечебные кабинеты)" as cabinets {
+  * **id** : BIGINT <<PK>>
+  --
+  * name : VARCHAR(50) <<UQ>>
+  * chair_number : INT
+  description : VARCHAR(255)
+  * is_available : BOOLEAN
+}
+
+entity "service_categories\n(Категории услуг)" as service_categories {
+  * **id** : BIGINT <<PK>>
+  --
+  * name : VARCHAR(100) <<UQ>>
+  description : VARCHAR(255)
+  * sort_order : INT
+}
+
+entity "dental_services\n(Прейскурант услуг)" as dental_services {
+  * **id** : BIGINT <<PK>>
+  --
+  * category_id : BIGINT <<FK>> [ON DELETE RESTRICT]
+  * name : VARCHAR(150)
+  description : TEXT
+  * price : NUMERIC(10,2)
+  * duration_minutes : INT [кратно 30]
+  * is_active : BOOLEAN
+  * created_at : TIMESTAMPTZ
+}
+
+entity "doctor_schedules\n(График смен)" as doctor_schedules {
+  * **id** : BIGINT <<PK>>
+  --
+  * doctor_id : BIGINT <<FK>> [ON DELETE RESTRICT]
+  * cabinet_id : BIGINT <<FK>> [ON DELETE RESTRICT]
+  * work_date : DATE
+  * start_time : TIME
+  * end_time : TIME
+  * created_at : TIMESTAMPTZ
+}
+
+entity "time_slots\n(Слоты расписания)" as time_slots {
+  * **id** : BIGINT <<PK>>
+  --
+  * schedule_id : BIGINT <<FK>> [ON DELETE CASCADE]
+  * doctor_id : BIGINT <<FK>> [ON DELETE RESTRICT]
+  * cabinet_id : BIGINT <<FK>> [ON DELETE RESTRICT]
+  * slot_date : DATE
+  * start_time : TIME
+  * end_time : TIME
+  * status : VARCHAR(20) [free, reserved, booked]
+  reserved_until : TIMESTAMPTZ
+}
+
+entity "patients\n(Картотека пациентов)" as patients {
+  * **id** : BIGINT <<PK>>
+  --
+  * full_name : VARCHAR(120)
+  * phone : VARCHAR(20) <<UQ>>
+  email : VARCHAR(120)
+  birth_date : DATE
+  telegram_chat_id : BIGINT <<UQ>>
+  notes : TEXT
+  * created_at : TIMESTAMPTZ
+}
+
+entity "appointments\n(Журнал приёмов)" as appointments {
+  * **id** : BIGINT <<PK>>
+  --
+  * appointment_number : VARCHAR(32) <<UQ>>
+  * patient_id : BIGINT <<FK>> [ON DELETE RESTRICT]
+  * doctor_id : BIGINT <<FK>> [ON DELETE RESTRICT]
+  * slot_id : BIGINT <<FK, UQ>> [ON DELETE RESTRICT]
+  * cabinet_id : BIGINT <<FK>> [ON DELETE RESTRICT]
+  created_by_user_id : BIGINT <<FK>> [ON DELETE SET NULL]
+  * status : VARCHAR(20)
+  patient_complaint : TEXT
+  doctor_notes : TEXT
+  * is_confirmed_by_patient : BOOLEAN
+  * created_at : TIMESTAMPTZ
+  * updated_at : TIMESTAMPTZ
+}
+
+entity "appointment_services\n(Услуги в приёме, M:N)" as appointment_services {
+  * **id** : BIGINT <<PK>>
+  --
+  * appointment_id : BIGINT <<FK>> [ON DELETE CASCADE]
+  * service_id : BIGINT <<FK>> [ON DELETE RESTRICT]
+  * quantity : INT
+  * price_at_booking : NUMERIC(10,2)
+}
+
+entity "notifications\n(Очередь Telegram)" as notifications {
+  * **id** : BIGINT <<PK>>
+  --
+  * appointment_id : BIGINT <<FK>> [ON DELETE CASCADE]
+  * telegram_chat_id : BIGINT
+  * type : VARCHAR(30)
+  * status : VARCHAR(20) [pending, sent, failed]
+  * scheduled_at : TIMESTAMPTZ
+  sent_at : TIMESTAMPTZ
+  response_payload : TEXT
+}
+
+' Реляционные связи
+users ||--o| doctors : "user_id (1:1)"
+doctors ||--o{ doctor_schedules : "doctor_id"
+cabinets ||--o{ doctor_schedules : "cabinet_id"
+doctor_schedules ||--|{ time_slots : "schedule_id"
+doctors ||--o{ time_slots : "doctor_id"
+cabinets ||--o{ time_slots : "cabinet_id"
+
+service_categories ||--o{ dental_services : "category_id"
+
+patients ||--o{ appointments : "patient_id"
+doctors ||--o{ appointments : "doctor_id"
+cabinets ||--o{ appointments : "cabinet_id"
+time_slots ||--o| appointments : "slot_id (1:1)"
+users |o--o{ appointments : "created_by_user_id"
+
+appointments ||--|{ appointment_services : "appointment_id"
+dental_services ||--o{ appointment_services : "service_id"
+
+appointments ||--o{ notifications : "appointment_id"
+
+@enduml
