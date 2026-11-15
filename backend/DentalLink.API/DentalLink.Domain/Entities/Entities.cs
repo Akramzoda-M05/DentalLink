@@ -1,7 +1,53 @@
-using DentalLink.Domain.Enums;
-
 namespace DentalLink.Domain.Entities
 {
+    public sealed class UserRole
+    {
+        public long Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public ICollection<User> Users { get; set; } = [];
+    }
+
+    public sealed class DoctorSpecialization
+    {
+        public long Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public ICollection<Doctor> Doctors { get; set; } = [];
+    }
+
+    public sealed class TimeSlotStatus
+    {
+        public long Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public ICollection<TimeSlot> TimeSlots { get; set; } = [];
+    }
+
+    public sealed class AppointmentStatus
+    {
+        public long Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public ICollection<Appointment> Appointments { get; set; } = [];
+    }
+
+    public sealed class NotificationType
+    {
+        public long Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public ICollection<Notification> Notifications { get; set; } = [];
+    }
+
+    public sealed class NotificationStatus
+    {
+        public long Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public ICollection<Notification> Notifications { get; set; } = [];
+    }
+
     // -------------------------------------------------------------------------
     // users — учётные записи персонала клиники
     // -------------------------------------------------------------------------
@@ -12,7 +58,8 @@ namespace DentalLink.Domain.Entities
         public string Email { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
-        public UserRole Role { get; set; }
+        public long RoleId { get; set; }
+        public UserRole Role { get; set; } = null!;
         public bool IsActive { get; set; } = true;
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -29,7 +76,8 @@ namespace DentalLink.Domain.Entities
     {
         public long Id { get; set; }
         public long UserId { get; set; }
-        public DoctorSpecialization Specialization { get; set; }
+        public long SpecializationId { get; set; }
+        public DoctorSpecialization Specialization { get; set; } = null!;
         public string? Qualification { get; set; }
         public int ExperienceYears { get; set; }
         public string? Bio { get; set; }
@@ -121,7 +169,8 @@ namespace DentalLink.Domain.Entities
         public DateOnly SlotDate { get; set; }
         public TimeOnly StartTime { get; set; }
         public TimeOnly EndTime { get; set; }
-        public SlotStatus Status { get; set; } = SlotStatus.Free;
+        public long StatusId { get; set; } = LookupIds.TimeSlotStatus.Free;
+        public TimeSlotStatus Status { get; set; } = null!;
         public DateTimeOffset? ReservedUntil { get; set; }
 
         public DoctorSchedule Schedule { get; set; } = null!;
@@ -159,7 +208,8 @@ namespace DentalLink.Domain.Entities
         public long SlotId { get; set; }
         public long CabinetId { get; set; }
         public long? CreatedByUserId { get; set; }
-        public AppointmentStatus Status { get; set; } = AppointmentStatus.Confirmed;
+        public long StatusId { get; set; } = LookupIds.AppointmentStatus.Confirmed;
+        public AppointmentStatus Status { get; set; } = null!;
         public string? PatientComplaint { get; set; }
         public string? DoctorNotes { get; set; }
         public bool IsConfirmedByPatient { get; set; } = false;
@@ -198,8 +248,10 @@ namespace DentalLink.Domain.Entities
         public long Id { get; set; }
         public long AppointmentId { get; set; }
         public long TelegramChatId { get; set; }
-        public NotificationType Type { get; set; }
-        public NotificationStatus Status { get; set; } = NotificationStatus.Pending;
+        public long TypeId { get; set; }
+        public NotificationType Type { get; set; } = null!;
+        public long StatusId { get; set; } = LookupIds.NotificationStatus.Pending;
+        public NotificationStatus Status { get; set; } = null!;
         public DateTimeOffset ScheduledAt { get; set; }
         public DateTimeOffset? SentAt { get; set; }
         public string? ResponsePayload { get; set; }

@@ -11,8 +11,12 @@ namespace DentalLink.Infrastructure
             this IServiceCollection services,
             IConfiguration configuration)
         {
-            var connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? "Host=127.0.0.1;Port=5432;Database=dentallink_db;Username=postgres;Password=postgres;";
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException(
+                    "ConnectionStrings:DefaultConnection must be configured through the environment.");
+            }
 
             services.AddDbContext<DentalLinkDbContext>(options =>
                 options.UseNpgsql(connectionString, npgsql =>

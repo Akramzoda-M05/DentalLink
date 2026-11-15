@@ -22,23 +22,37 @@ entity "users\n(Персонал клиники)" as users {
   * email : VARCHAR(120) <<UQ>>
   * password_hash : VARCHAR(255)
   * phone : VARCHAR(20) <<UQ>>
-  * role : VARCHAR(20) [admin, receptionist, doctor]
+  * role_id : BIGINT <<FK>>
   * is_active : BOOLEAN
   * created_at : TIMESTAMPTZ
   * updated_at : TIMESTAMPTZ
+}
+
+entity "user_roles\n(Справочник ролей)" as user_roles {
+  * **id** : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
 }
 
 entity "doctors\n(Профили врачей)" as doctors {
   * **id** : BIGINT <<PK>>
   --
   * user_id : BIGINT <<FK, UQ>> [ON DELETE RESTRICT]
-  * specialization : VARCHAR(30)
+  * specialization_id : BIGINT <<FK>>
   qualification : VARCHAR(100)
   * experience_years : INT
   bio : TEXT
   avatar_url : VARCHAR(255)
   * is_active : BOOLEAN
   * created_at : TIMESTAMPTZ
+}
+
+entity "doctor_specializations\n(Справочник специализаций)" as doctor_specializations {
+  * **id** : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
 }
 
 entity "cabinets\n(Лечебные кабинеты)" as cabinets {
@@ -90,8 +104,36 @@ entity "time_slots\n(Слоты расписания)" as time_slots {
   * slot_date : DATE
   * start_time : TIME
   * end_time : TIME
-  * status : VARCHAR(20) [free, reserved, booked]
+  * status_id : BIGINT <<FK>>
   reserved_until : TIMESTAMPTZ
+}
+
+entity "time_slot_statuses\n(Справочник статусов слотов)" as time_slot_statuses {
+  * **id** : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
+}
+
+entity "appointment_statuses\n(Справочник статусов записей)" as appointment_statuses {
+  * **id** : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
+}
+
+entity "notification_types\n(Справочник типов уведомлений)" as notification_types {
+  * **id** : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
+}
+
+entity "notification_statuses\n(Справочник статусов уведомлений)" as notification_statuses {
+  * **id** : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
 }
 
 entity "patients\n(Картотека пациентов)" as patients {
@@ -115,7 +157,7 @@ entity "appointments\n(Журнал приёмов)" as appointments {
   * slot_id : BIGINT <<FK, UQ>> [ON DELETE RESTRICT]
   * cabinet_id : BIGINT <<FK>> [ON DELETE RESTRICT]
   created_by_user_id : BIGINT <<FK>> [ON DELETE SET NULL]
-  * status : VARCHAR(20)
+  * status_id : BIGINT <<FK>>
   patient_complaint : TEXT
   doctor_notes : TEXT
   * is_confirmed_by_patient : BOOLEAN
@@ -137,8 +179,8 @@ entity "notifications\n(Очередь Telegram)" as notifications {
   --
   * appointment_id : BIGINT <<FK>> [ON DELETE CASCADE]
   * telegram_chat_id : BIGINT
-  * type : VARCHAR(30)
-  * status : VARCHAR(20) [pending, sent, failed]
+  * type_id : BIGINT <<FK>>
+  * status_id : BIGINT <<FK>>
   * scheduled_at : TIMESTAMPTZ
   sent_at : TIMESTAMPTZ
   response_payload : TEXT
@@ -146,6 +188,12 @@ entity "notifications\n(Очередь Telegram)" as notifications {
 
 ' Реляционные связи
 users ||--o| doctors : "user_id (1:1)"
+user_roles ||--o{ users : "role_id"
+doctor_specializations ||--o{ doctors : "specialization_id"
+time_slot_statuses ||--o{ time_slots : "status_id"
+appointment_statuses ||--o{ appointments : "status_id"
+notification_types ||--o{ notifications : "type_id"
+notification_statuses ||--o{ notifications : "status_id"
 doctors ||--o{ doctor_schedules : "doctor_id"
 cabinets ||--o{ doctor_schedules : "cabinet_id"
 doctor_schedules ||--|{ time_slots : "schedule_id"

@@ -14,23 +14,37 @@ entity users {
   * email : VARCHAR(120) <<UQ>>
   * password_hash : VARCHAR(255)
   * phone : VARCHAR(20) <<UQ>>
-  * role : VARCHAR(20) /* admin, receptionist, doctor */
+  * role_id : BIGINT <<FK>>
   * is_active : BOOLEAN
   * created_at : TIMESTAMP
   * updated_at : TIMESTAMP
+}
+
+entity user_roles {
+  * id : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
 }
 
 entity doctors {
   * id : BIGINT <<PK>>
   --
   * user_id : BIGINT <<FK, UQ>>
-  * specialization : VARCHAR(30) /* dentist, therapist, surgeon, etc. */
+  * specialization_id : BIGINT <<FK>>
   qualification : VARCHAR(100)
   * experience_years : INT
   bio : TEXT
   avatar_url : VARCHAR(255)
   * is_active : BOOLEAN
   * created_at : TIMESTAMP
+}
+
+entity doctor_specializations {
+  * id : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
 }
 
 entity cabinets {
@@ -82,8 +96,36 @@ entity time_slots {
   * slot_date : DATE
   * start_time : TIME
   * end_time : TIME
-  * status : VARCHAR(20) /* free, reserved, booked */
+  * status_id : BIGINT <<FK>>
   reserved_until : TIMESTAMP
+}
+
+entity time_slot_statuses {
+  * id : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
+}
+
+entity appointment_statuses {
+  * id : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
+}
+
+entity notification_types {
+  * id : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
+}
+
+entity notification_statuses {
+  * id : BIGINT <<PK>>
+  --
+  * code : VARCHAR(32) <<UQ>>
+  * name : VARCHAR(80)
 }
 
 entity patients {
@@ -107,7 +149,7 @@ entity appointments {
   * slot_id : BIGINT <<FK, UQ>>
   * cabinet_id : BIGINT <<FK>>
   created_by_user_id : BIGINT <<FK>>
-  * status : VARCHAR(20) /* confirmed, arrived, in_progress, completed, cancelled, no_show */
+  * status_id : BIGINT <<FK>>
   patient_complaint : TEXT
   doctor_notes : TEXT
   * is_confirmed_by_patient : BOOLEAN
@@ -129,8 +171,8 @@ entity notifications {
   --
   * appointment_id : BIGINT <<FK>>
   * telegram_chat_id : BIGINT
-  * type : VARCHAR(30) /* confirmation, reminder_24h, reminder_2h, cancellation */
-  * status : VARCHAR(20) /* pending, sent, failed */
+  * type_id : BIGINT <<FK>>
+  * status_id : BIGINT <<FK>>
   * scheduled_at : TIMESTAMP
   sent_at : TIMESTAMP
   response_payload : TEXT
@@ -138,6 +180,12 @@ entity notifications {
 
 ' Связи между сущностями (Нотация Crow's Foot)
 users ||--o| doctors : "user_id"
+user_roles ||--o{ users : "role_id"
+doctor_specializations ||--o{ doctors : "specialization_id"
+time_slot_statuses ||--o{ time_slots : "status_id"
+appointment_statuses ||--o{ appointments : "status_id"
+notification_types ||--o{ notifications : "type_id"
+notification_statuses ||--o{ notifications : "status_id"
 doctors ||--o{ doctor_schedules : "doctor_id"
 cabinets ||--o{ doctor_schedules : "cabinet_id"
 doctor_schedules ||--|{ time_slots : "schedule_id"

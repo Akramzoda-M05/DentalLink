@@ -32,9 +32,9 @@ SELECT
     p.full_name                                 AS "Пациент",
     p.phone                                     AS "Телефон пациента",
     u_doc.full_name                             AS "Лечащий врач",
-    d.specialization                            AS "Специализация",
+    specialization.code                         AS "Специализация",
     c.name                                      AS "Кабинет",
-    a.status                                    AS "Статус визита",
+    appointment_status.code                     AS "Статус визита",
     CASE
         WHEN a.is_confirmed_by_patient THEN 'Да (Telegram)'
         ELSE 'Нет'
@@ -42,9 +42,11 @@ SELECT
 FROM appointments a
 JOIN patients p       ON a.patient_id = p.id
 JOIN doctors d        ON a.doctor_id = d.id
+JOIN doctor_specializations specialization ON d.specialization_id = specialization.id
 JOIN users u_doc      ON d.user_id = u_doc.id
 JOIN cabinets c       ON a.cabinet_id = c.id
 JOIN time_slots ts    ON a.slot_id = ts.id
+JOIN appointment_statuses appointment_status ON a.status_id = appointment_status.id
 WHERE ts.slot_date = '2026-11-12'
 ORDER BY ts.start_time ASC, c.name ASC;
 
@@ -81,19 +83,21 @@ ORDER BY p.full_name ASC;
 -- =============================================================================
 SELECT
     u.full_name                                 AS "Врач-стоматолог",
-    d.specialization                            AS "Специализация",
-    COUNT(a.id)                                 AS "Всего записей",
-    COUNT(CASE WHEN a.status = 'completed' THEN 1 END)   AS "Завершено приёмов",
-    COUNT(CASE WHEN a.status = 'cancelled' THEN 1 END)   AS "Отменено пациентом",
-    COUNT(CASE WHEN a.status = 'no_show' THEN 1 END)     AS "Неявок",
+    specialization.code                         AS "Специализация",
+    COUNT(DISTINCT a.id)                        AS "Всего записей",
+    COUNT(DISTINCT a.id) FILTER (WHERE appointment_status.code = 'completed') AS "Завершено приёмов",
+    COUNT(DISTINCT a.id) FILTER (WHERE appointment_status.code = 'cancelled') AS "Отменено пациентом",
+    COUNT(DISTINCT a.id) FILTER (WHERE appointment_status.code = 'no_show')   AS "Неявок",
     COALESCE(SUM(
-        CASE WHEN a.status = 'completed' THEN aps.quantity * aps.price_at_booking ELSE 0 END
+        CASE WHEN appointment_status.code = 'completed' THEN aps.quantity * aps.price_at_booking ELSE 0 END
     ), 0.00)                                    AS "Выручка (сомони, TJS)"
 FROM doctors d
 JOIN users u                ON d.user_id = u.id
+JOIN doctor_specializations specialization ON d.specialization_id = specialization.id
 LEFT JOIN appointments a    ON d.id = a.doctor_id
+LEFT JOIN appointment_statuses appointment_status ON a.status_id = appointment_status.id
 LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
-GROUP BY d.id, u.full_name, d.specialization
+GROUP BY d.id, u.full_name, specialization.code
 ORDER BY "Выручка (сомони, TJS)" DESC, "Всего записей" DESC;
 
 
@@ -136,19 +140,21 @@ SELECT
     ts.slot_date                                AS "Дата слота",
     to_char(ts.start_time, 'HH24:MI')           AS "Время начала",
     to_char(ts.end_time, 'HH24:MI')             AS "Время окончания",
-    ts.status                                   AS "Текущий статус",
+    slot_status.code                            AS "Текущий статус",
     CASE
-        WHEN ts.status = 'free' THEN 'Доступен для бронирования'
-        WHEN ts.status = 'reserved' THEN 'Временно удерживается (до 10 мин)'
+        WHEN slot_status.code = 'free' THEN 'Доступен для бронирования'
+        WHEN slot_status.code = 'reserved' THEN 'Временно удерживается (до 10 мин)'
         ELSE 'Занят'
     END                                         AS "Примечание для сайта"
 FROM time_slots ts
 JOIN doctors d  ON ts.doctor_id = d.id
+JOIN doctor_specializations specialization ON d.specialization_id = specialization.id
 JOIN users u    ON d.user_id = u.id
 JOIN cabinets c ON ts.cabinet_id = c.id
+JOIN time_slot_statuses slot_status ON ts.status_id = slot_status.id
 WHERE ts.slot_date = '2026-11-12'
-  AND d.specialization = 'therapist'
-  AND ts.status IN ('free', 'reserved')
+  AND specialization.code = 'therapist'
+  AND slot_status.code IN ('free', 'reserved')
 ORDER BY ts.start_time ASC;
 
 
@@ -167,7 +173,7 @@ SELECT
     u.full_name                                 AS "Врач",
     c.name                                      AS "Кабинет",
     to_char(a.created_at, 'DD.MM.YYYY HH24:MI') AS "Дата создания",
-    a.status                                    AS "Статус",
+    appointment_status.code                     AS "Статус",
     COUNT(aps.service_id)                       AS "Кол-во услуг",
     COALESCE(SUM(aps.quantity * aps.price_at_booking), 0.00) AS "Сумма к оплате (TJS)"
 FROM appointments a
@@ -176,7 +182,8 @@ JOIN doctors d      ON a.doctor_id = d.id
 JOIN users u        ON d.user_id = u.id
 JOIN cabinets c     ON a.cabinet_id = c.id
 LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
-WHERE a.status = 'completed'
-GROUP BY a.id, a.appointment_number, p.full_name, u.full_name, c.name, a.created_at, a.status
+JOIN appointment_statuses appointment_status ON a.status_id = appointment_status.id
+WHERE appointment_status.code = 'completed'
+GROUP BY a.id, a.appointment_number, p.full_name, u.full_name, c.name, a.created_at, appointment_status.code
 ORDER BY a.created_at DESC
 LIMIT 5 OFFSET 0;

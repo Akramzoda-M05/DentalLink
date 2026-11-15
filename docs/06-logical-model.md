@@ -103,7 +103,7 @@
 | `email` | VARCHAR(120) | UQ | нет | Корпоративный e-mail (логин) |
 | `password_hash` | VARCHAR(255) | | нет | Хэш пароля (BCrypt / ASP.NET Identity) |
 | `phone` | VARCHAR(20) | UQ | нет | Контактный номер телефона |
-| `role` | VARCHAR(20) | | нет | Роль доступа: `'admin'`, `'receptionist'`, `'doctor'` |
+| `role_id` | BIGINT | FK → user_roles.id | нет | Ссылка на справочник ролей сотрудников |
 | `is_active` | BOOLEAN | | нет | Флаг активности учётной записи (активен/заблокирован) |
 | `created_at` | TIMESTAMP | | нет | Дата и время создания учётной записи |
 | `updated_at` | TIMESTAMP | | нет | Дата и время последнего обновления профиля |
@@ -117,7 +117,7 @@
 |---|---|---|---|---|
 | `id` | BIGINT | PK | нет | Суррогатный первичный ключ |
 | `user_id` | BIGINT | FK → users.id, UQ | нет | Ссылка на базовую учётную запись пользователя (1:1) |
-| `specialization` | VARCHAR(30) | | нет | Направление: `'dentist'`, `'therapist'`, `'orthopedist'`, `'orthodontist'`, `'surgeon'`, `'implantologist'`, `'pediatric'`, `'hygienist'` |
+| `specialization_id` | BIGINT | FK → doctor_specializations.id | нет | Ссылка на справочник специализаций |
 | `qualification` | VARCHAR(100) | | да | Врачебная категория / учёная степень |
 | `experience_years` | INT | | нет | Стаж практической работы (лет) |
 | `bio` | TEXT | | да | Краткая биография и профессиональное резюме |
@@ -195,7 +195,7 @@
 | `slot_date` | DATE | | нет | Дата слота |
 | `start_time` | TIME | | нет | Начало слота (например, 10:00) |
 | `end_time` | TIME | | нет | Конец слота (например, 10:30) |
-| `status` | VARCHAR(20) | | нет | Статус слота: `'free'`, `'reserved'`, `'booked'` |
+| `status_id` | BIGINT | FK → time_slot_statuses.id | нет | Ссылка на справочник состояний слота |
 | `reserved_until` | TIMESTAMP | | да | Время истечения временной блокировки (TTL 10 мин) |
 
 ---
@@ -228,7 +228,7 @@
 | `slot_id` | BIGINT | FK → time_slots.id, UQ | нет | Забронированный слот расписания (1:1) |
 | `cabinet_id` | BIGINT | FK → cabinets.id | нет | Кабинет проведения процедуры |
 | `created_by_user_id` | BIGINT | FK → users.id | да | Регистратор, оформивший запись (NULL при онлайн-записи) |
-| `status` | VARCHAR(20) | | нет | Статус: `'confirmed'`, `'arrived'`, `'in_progress'`, `'completed'`, `'cancelled'`, `'no_show'` |
+| `status_id` | BIGINT | FK → appointment_statuses.id | нет | Ссылка на справочник статусов записи |
 | `patient_complaint` | TEXT | | да | Жалобы пациента при записи |
 | `doctor_notes` | TEXT | | да | Заключение врача по итогам осмотра |
 | `is_confirmed_by_patient` | BOOLEAN | | нет | Отметка о подтверждении визита через Telegram / звонок |
@@ -258,8 +258,8 @@
 | `id` | BIGINT | PK | нет | Суррогатный первичный ключ |
 | `appointment_id` | BIGINT | FK → appointments.id | нет | Запись на приём, к которой относится оповещение |
 | `telegram_chat_id` | BIGINT | | нет | Идентификатор адресата в Telegram |
-| `type` | VARCHAR(30) | | нет | Тип: `'confirmation'`, `'reminder_24h'`, `'reminder_2h'`, `'cancellation'` |
-| `status` | VARCHAR(20) | | нет | Статус доставки: `'pending'`, `'sent'`, `'failed'` |
+| `type_id` | BIGINT | FK → notification_types.id | нет | Ссылка на справочник типов уведомлений |
+| `status_id` | BIGINT | FK → notification_statuses.id | нет | Ссылка на справочник статусов доставки |
 | `scheduled_at` | TIMESTAMP | | нет | Запланированное время отправки сообщения |
 | `sent_at` | TIMESTAMP | | да | Фактическое время успешной доставки |
 | `response_payload` | TEXT | | да | Ответное действие пациента (нажатие кнопки «Подтверждаю») |

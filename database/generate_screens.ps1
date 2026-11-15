@@ -5,23 +5,41 @@
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms
 
-$OutputDir = "D:\GitHub\DentalLink\docs\07-screens"
+$OutputDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\docs\07-screens"))
 if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 }
 
 $env:LC_ALL = "C"
-$env:PGPASSWORD = "postgres"
 $env:PGCLIENTENCODING = "utf-8"
-$psql = "D:\Program Files\PostgreSQL\18\bin\psql.exe"
+if ([string]::IsNullOrWhiteSpace($env:PGPASSWORD)) {
+    throw "Set PGPASSWORD in the process environment before running this local verification script."
+}
+foreach ($name in @("DENTALLINK_DB_HOST", "DENTALLINK_DB_PORT", "DENTALLINK_DB_NAME", "DENTALLINK_DB_USER")) {
+    if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+        throw "Set $name in the process environment before running this local verification script."
+    }
+}
+$DatabaseHost = $env:DENTALLINK_DB_HOST
+$DatabasePort = $env:DENTALLINK_DB_PORT
+$DatabaseName = $env:DENTALLINK_DB_NAME
+$DatabaseUser = $env:DENTALLINK_DB_USER
+$psql = (Get-Command psql -ErrorAction Stop).Source
 
 function Execute-SqlFile {
     param([string]$Sql)
     $tmp = [System.IO.Path]::GetTempFileName() + ".sql"
     [System.IO.File]::WriteAllText($tmp, $Sql, [System.Text.Encoding]::UTF8)
-    $res = & $psql -U postgres -h 127.0.0.1 -p 5432 -d dentallink_db -f $tmp
-    Remove-Item $tmp -ErrorAction SilentlyContinue
-    return ($res -join "`r`n")
+    try {
+        $res = & $psql -U $DatabaseUser -h $DatabaseHost -p $DatabasePort -d $DatabaseName -f $tmp
+        if ($LASTEXITCODE -ne 0) {
+            throw "psql exited with code $LASTEXITCODE."
+        }
+        return ($res -join "`r`n")
+    }
+    finally {
+        Remove-Item -LiteralPath $tmp -ErrorAction SilentlyContinue
+    }
 }
 
 function Render-QueryWindow {
@@ -163,8 +181,8 @@ function Render-QueryWindow {
 # -----------------------------------------------------------------------------
 $sql01 = @"
 -- =============================================================================
--- ПРОВЕРКА ФИЗИЧЕСКОЙ МОДЕЛИ БД DentalLink (PostgreSQL 18.6)
--- Проверка наличия всех 11 таблиц из docs/06-logical-model.md (3НФ)
+-- ПРОВЕРКА ФИЗИЧЕСКОЙ МОДЕЛИ БД DentalLink
+-- Проверка наличия всех 17 таблиц из docs/06-logical-model.md (3НФ)
 -- =============================================================================
 SELECT
     c.relname                    AS "Имя таблицы",
@@ -178,10 +196,10 @@ ORDER BY c.relname ASC;
 "@
 $out01 = Execute-SqlFile -Sql $sql01
 Render-QueryWindow `
-    -Title "dentallink_db (PostgreSQL 18) - Список таблиц схемы public" `
-    -SubTitle "Host: 127.0.0.1:5432 | Database: dentallink_db | User: postgres | Storage: UTF-8 | Engine: PostgreSQL" `
+    -Title "dentallink_db (PostgreSQL) - Список таблиц схемы public" `
+    -SubTitle "Host: $DatabaseHost`:$DatabasePort | Database: $DatabaseName | User: $DatabaseUser | Storage: UTF-8 | Engine: PostgreSQL" `
     -SqlText $sql01 `
-    -StatusText "✓ Скрипт schema.sql выполнен успешно. Все 11 таблиц и пользовательские индексы созданы и активны." `
+    -StatusText "✓ Схема создана. Все 17 таблиц и пользовательские индексы созданы и активны." `
     -OutputText $out01 `
     -OutputPath "$OutputDir\01-schema-tables.png" `
     -Width 1350 `
@@ -194,9 +212,15 @@ $sql02 = @"
 -- =============================================================================
 -- ПРОВЕРКА НАПОЛНЕНИЯ БД ТЕСТОВЫМИ ДАННЫМИ (seed.sql)
 -- Требования: >= 3 записей в справочниках, >= 10 в главной таблице (appointments)
--- Имена и ФИО строго на кириллице, пароли всех ролей захэшированы BCrypt
+-- Синтетические локальные строки; проверяем количество и целостность справочников
 -- =============================================================================
-SELECT 'users' AS table_name, count(*) AS row_count FROM users
+SELECT 'user_roles' AS table_name, count(*) AS row_count FROM user_roles
+UNION ALL SELECT 'doctor_specializations', count(*) FROM doctor_specializations
+UNION ALL SELECT 'time_slot_statuses', count(*) FROM time_slot_statuses
+UNION ALL SELECT 'appointment_statuses', count(*) FROM appointment_statuses
+UNION ALL SELECT 'notification_types', count(*) FROM notification_types
+UNION ALL SELECT 'notification_statuses', count(*) FROM notification_statuses
+UNION ALL SELECT 'users', count(*) FROM users
 UNION ALL SELECT 'doctors', count(*) FROM doctors
 UNION ALL SELECT 'cabinets', count(*) FROM cabinets
 UNION ALL SELECT 'service_categories', count(*) FROM service_categories
@@ -211,8 +235,8 @@ ORDER BY table_name ASC;
 "@
 $out02 = Execute-SqlFile -Sql $sql02
 Render-QueryWindow `
-    -Title "dentallink_db (PostgreSQL 18) - Верификация строк (seed.sql)" `
-    -SubTitle "Host: 127.0.0.1:5432 | Database: dentallink_db | Main table appointments: 12 rows (>= 10 required)" `
+    -Title "dentallink_db (PostgreSQL) - Верификация строк (seed.sql)" `
+    -SubTitle "Host: $DatabaseHost`:$DatabasePort | Database: $DatabaseName | Main table appointments: 12 rows (>= 10 required)" `
     -SqlText $sql02 `
     -StatusText "✓ Скрипт seed.sql выполнен успешно: главная таблица содержит 12 записей, все справочники >= 3 записей." `
     -OutputText $out02 `
@@ -221,35 +245,15 @@ Render-QueryWindow `
     -MinHeight 750
 
 # -----------------------------------------------------------------------------
+$queriesSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "queries.sql"), [Text.Encoding]::UTF8)
+$queryMatches = [regex]::Matches($queriesSource, '(?is)\bSELECT\b.*?;')
+if ($queryMatches.Count -ne 6) {
+    throw "Expected six canonical SQL queries, found $($queryMatches.Count)."
+}
+$queryStatements = @($queryMatches | ForEach-Object { $_.Value.Trim() })
 # SCREEN 03: Запрос 1 (JOIN 3+ таблиц)
 # -----------------------------------------------------------------------------
-$sql03 = @"
--- =============================================================================
--- ЗАПРОС 1: JOIN трёх и более таблиц (Реестр расписания на дату)
--- Ссылка на ФТ: ФТ-05 (Интерактивная сетка Timeline), ФТ-06 (Расписание врача)
--- Связывает 5 таблиц: appointments + patients + doctors + users + cabinets + time_slots
--- =============================================================================
-SELECT
-    a.appointment_number                        AS "Номер талона",
-    ts.slot_date                                AS "Дата приёма",
-    to_char(ts.start_time, 'HH24:MI') || ' - ' ||
-    to_char(ts.end_time, 'HH24:MI')            AS "Время визита",
-    p.full_name                                 AS "Пациент",
-    p.phone                                     AS "Телефон",
-    u_doc.full_name                             AS "Лечащий врач",
-    d.specialization                            AS "Специализация",
-    c.name                                      AS "Кабинет",
-    a.status                                    AS "Статус визита",
-    CASE WHEN a.is_confirmed_by_patient THEN 'Да (Telegram)' ELSE 'Нет' END AS "Подтверждено"
-FROM appointments a
-JOIN patients p       ON a.patient_id = p.id
-JOIN doctors d        ON a.doctor_id = d.id
-JOIN users u_doc      ON d.user_id = u_doc.id
-JOIN cabinets c       ON a.cabinet_id = c.id
-JOIN time_slots ts    ON a.slot_id = ts.id
-WHERE ts.slot_date = '2026-11-12'
-ORDER BY ts.start_time ASC, c.name ASC;
-"@
+$sql03 = $queryStatements[0].Trim()
 $out03 = Execute-SqlFile -Sql $sql03
 Render-QueryWindow `
     -Title "Запрос 1 (JOIN 3+ таблиц) - Реестр приёмов [ФТ-05, ФТ-06]" `
@@ -264,25 +268,7 @@ Render-QueryWindow `
 # -----------------------------------------------------------------------------
 # SCREEN 04: Запрос 2 (LIKE / ILIKE)
 # -----------------------------------------------------------------------------
-$sql04 = @"
--- =============================================================================
--- ЗАПРОС 2: Поиск по текстовому шаблону с использованием LIKE / ILIKE
--- Ссылка на ФТ: ФТ-02 (Просмотр каталога врачей), ФТ-10 (Быстрый поиск пациента)
--- Поиск по части фамилии (регистронезависимо ILIKE) и коду оператора (+99290%)
--- =============================================================================
-SELECT
-    p.id                                        AS "ID пациента",
-    p.full_name                                 AS "ФИО пациента",
-    p.phone                                     AS "Номер телефона",
-    COALESCE(p.email, 'Не указан')              AS "E-mail",
-    to_char(p.birth_date, 'DD.MM.YYYY')         AS "Дата рождения",
-    p.notes                                     AS "Медицинские примечания",
-    to_char(p.created_at, 'DD.MM.YYYY HH24:MI') AS "Дата обращения"
-FROM patients p
-WHERE p.full_name ILIKE '%Каримов%'
-   OR p.phone LIKE '+99290%'
-ORDER BY p.full_name ASC;
-"@
+$sql04 = $queryStatements[1].Trim()
 $out04 = Execute-SqlFile -Sql $sql04
 Render-QueryWindow `
     -Title "Запрос 2 (LIKE / ILIKE) - Поиск в картотеке пациентов [ФТ-02, ФТ-10]" `
@@ -297,29 +283,7 @@ Render-QueryWindow `
 # -----------------------------------------------------------------------------
 # SCREEN 05: Запрос 3 (GROUP BY + COUNT)
 # -----------------------------------------------------------------------------
-$sql05 = @"
--- =============================================================================
--- ЗАПРОС 3: Агрегация с группировкой (GROUP BY + COUNT)
--- Ссылка на ФТ: ФТ-11 (Экспорт аналитического отчёта по врачам), ФТ-08 (Смены)
--- Сводная статистика работы врачей: приёмы, завершённые визиты, отмены и доход
--- =============================================================================
-SELECT
-    u.full_name                                 AS "Врач-стоматолог",
-    d.specialization                            AS "Специализация",
-    COUNT(a.id)                                 AS "Всего записей",
-    COUNT(CASE WHEN a.status = 'completed' THEN 1 END)   AS "Завершено приёмов",
-    COUNT(CASE WHEN a.status = 'cancelled' THEN 1 END)   AS "Отменено пациентом",
-    COUNT(CASE WHEN a.status = 'no_show' THEN 1 END)     AS "Неявок",
-    COALESCE(SUM(
-        CASE WHEN a.status = 'completed' THEN aps.quantity * aps.price_at_booking ELSE 0 END
-    ), 0.00)                                    AS "Выручка (сомони, TJS)"
-FROM doctors d
-JOIN users u                ON d.user_id = u.id
-LEFT JOIN appointments a    ON d.id = a.doctor_id
-LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
-GROUP BY d.id, u.full_name, d.specialization
-ORDER BY "Выручка (сомони, TJS)" DESC, "Всего записей" DESC;
-"@
+$sql05 = $queryStatements[2].Trim()
 $out05 = Execute-SqlFile -Sql $sql05
 Render-QueryWindow `
     -Title "Запрос 3 (GROUP BY + COUNT) - Аналитика загрузки и выручки [ФТ-08, ФТ-11]" `
@@ -334,25 +298,7 @@ Render-QueryWindow `
 # -----------------------------------------------------------------------------
 # SCREEN 06: Запрос 4 (LEFT JOIN)
 # -----------------------------------------------------------------------------
-$sql06 = @"
--- =============================================================================
--- ЗАПРОС 4: Внешнее объединение (LEFT JOIN)
--- Ссылка на ФТ: ФТ-02 (Просмотр каталога врачей и услуг), ФТ-09 (Справочники)
--- Вывод полного прейскуранта категорий с подсчётом количества услуг и цен
--- =============================================================================
-SELECT
-    sc.id                                       AS "ID категории",
-    sc.name                                     AS "Наименование категории",
-    sc.sort_order                               AS "Порядок сортировки",
-    COUNT(ds.id)                                AS "Количество услуг",
-    COALESCE(MIN(ds.price), 0.00)               AS "Мин. цена (TJS)",
-    COALESCE(MAX(ds.price), 0.00)               AS "Макс. цена (TJS)",
-    COALESCE(ROUND(AVG(ds.price), 2), 0.00)     AS "Средняя цена (TJS)"
-FROM service_categories sc
-LEFT JOIN dental_services ds ON sc.id = ds.category_id AND ds.is_active = TRUE
-GROUP BY sc.id, sc.name, sc.sort_order
-ORDER BY sc.sort_order ASC;
-"@
+$sql06 = $queryStatements[3].Trim()
 $out06 = Execute-SqlFile -Sql $sql06
 Render-QueryWindow `
     -Title "Запрос 4 (LEFT JOIN) - Каталог категорий и статистика цен [ФТ-02, ФТ-09]" `
@@ -367,34 +313,7 @@ Render-QueryWindow `
 # -----------------------------------------------------------------------------
 # SCREEN 07: Запрос 5 (Фильтр по статусу и категории)
 # -----------------------------------------------------------------------------
-$sql07 = @"
--- =============================================================================
--- ЗАПРОС 5: Фильтрация по статусу и категории (WHERE status / category)
--- Ссылка на ФТ: ФТ-03 (Интерактивный календарь слотов), ФТ-04 (Онлайн-бронирование)
--- Выборка свободных и удерживаемых слотов к врачу-терапевту на выбранную дату
--- =============================================================================
-SELECT
-    ts.id                                       AS "ID слота",
-    u.full_name                                 AS "Врач-терапевт",
-    c.name                                      AS "Кабинет",
-    ts.slot_date                                AS "Дата слота",
-    to_char(ts.start_time, 'HH24:MI')           AS "Время начала",
-    to_char(ts.end_time, 'HH24:MI')             AS "Время окончания",
-    ts.status                                   AS "Текущий статус",
-    CASE
-        WHEN ts.status = 'free' THEN 'Доступен для бронирования'
-        WHEN ts.status = 'reserved' THEN 'Временно удерживается (до 10 мин)'
-        ELSE 'Занят'
-    END                                         AS "Примечание для сайта"
-FROM time_slots ts
-JOIN doctors d  ON ts.doctor_id = d.id
-JOIN users u    ON d.user_id = u.id
-JOIN cabinets c ON ts.cabinet_id = c.id
-WHERE ts.slot_date = '2026-11-12'
-  AND d.specialization = 'therapist'
-  AND ts.status IN ('free', 'reserved')
-ORDER BY ts.start_time ASC;
-"@
+$sql07 = $queryStatements[4].Trim()
 $out07 = Execute-SqlFile -Sql $sql07
 Render-QueryWindow `
     -Title "Запрос 5 (Фильтр по статусу/категории) - Свободные слоты терапевта [ФТ-03, ФТ-04]" `
@@ -409,33 +328,7 @@ Render-QueryWindow `
 # -----------------------------------------------------------------------------
 # SCREEN 08: Запрос 6 (LIMIT / OFFSET)
 # -----------------------------------------------------------------------------
-$sql08 = @"
--- =============================================================================
--- ЗАПРОС 6: Постраничная выборка (PAGINATION: LIMIT / OFFSET)
--- Ссылка на ФТ: ФТ-05 (Журнал приёмов в Timeline), ФТ-10 (История визитов)
--- Постраничная загрузка архива завершённых визитов (Размер: 5 строк, смещение: 0)
--- =============================================================================
-SELECT
-    a.id                                        AS "ID записи",
-    a.appointment_number                        AS "Талон",
-    p.full_name                                 AS "Пациент",
-    u.full_name                                 AS "Врач",
-    c.name                                      AS "Кабинет",
-    to_char(a.created_at, 'DD.MM.YYYY HH24:MI') AS "Дата создания",
-    a.status                                    AS "Статус",
-    COUNT(aps.service_id)                       AS "Кол-во услуг",
-    COALESCE(SUM(aps.quantity * aps.price_at_booking), 0.00) AS "Сумма к оплате (TJS)"
-FROM appointments a
-JOIN patients p     ON a.patient_id = p.id
-JOIN doctors d      ON a.doctor_id = d.id
-JOIN users u        ON d.user_id = u.id
-JOIN cabinets c     ON a.cabinet_id = c.id
-LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
-WHERE a.status = 'completed'
-GROUP BY a.id, a.appointment_number, p.full_name, u.full_name, c.name, a.created_at, a.status
-ORDER BY a.created_at DESC
-LIMIT 5 OFFSET 0;
-"@
+$sql08 = $queryStatements[5].Trim()
 $out08 = Execute-SqlFile -Sql $sql08
 Render-QueryWindow `
     -Title "Запрос 6 (LIMIT / OFFSET) - Постраничный архив приёмов [ФТ-05, ФТ-10]" `

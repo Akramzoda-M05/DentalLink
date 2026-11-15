@@ -6,7 +6,8 @@ namespace DentalLink.Application
     {
         public static IServiceCollection AddApplicationDI(this IServiceCollection services)
         {
-            // MediatR, FluentValidation, AutoMapper и другие сервисы прикладного слоя
+            services.AddMediatR(configuration =>
+                configuration.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly));
             return services;
         }
     }
