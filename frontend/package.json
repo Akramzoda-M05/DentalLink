@@ -1,0 +1,10 @@
+{
+  "name": "dentallink-frontend-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix ./dental_link run dev",
+    "build": "npm --prefix ./dental_link run build",
+    "lint": "npm --prefix ./dental_link run lint",
+    "preview": "npm --prefix ./dental_link run preview"
+  }
+}
