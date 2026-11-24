@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Запись на приём — DentalLink</title>
+  <meta name="description" content="Форма онлайн-записи на приём и лечение к специалистам DentalLink с валидацией через Constraint Validation API.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Bootstrap 5.3.3 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <!-- Стили по UI-kit -->
+  <link href="../assets/css/app.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Шапка DentalLink -->
+  <header class="mockup-header">
+    <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <a class="mockup-logo" href="layout.html">
+        <span>DentalLink 🦷</span>
+      </a>
+
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <form class="search-pill-container" role="search" method="get" action="doctors.html">
+          <label for="header-search-form" class="visually-hidden">Поиск врача</label>
+          <input type="search" class="search-pill" id="header-search-form" name="q" placeholder="Поиск...">
+        </form>
+        <nav aria-label="Основная навигация" class="d-flex align-items-center gap-2">
+          <a href="doctors.html" class="nav-pill-btn">Врачи</a>
+          <a href="layout.html" class="nav-pill-btn">Записи</a>
+          <a href="appointment-form.html" class="nav-pill-btn active" aria-current="page">Запись на приём</a>
+          <a href="doctor-form.html" class="nav-pill-btn">Новый врач</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Основное содержимое -->
+  <main class="container py-4">
+    <!-- Навигационная цепочка -->
+    <nav aria-label="Навигационная цепочка" class="mb-4">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="layout.html" class="text-decoration-none text-primary">Главная</a></li>
+        <li class="breadcrumb-item"><a href="doctors.html" class="text-decoration-none text-primary">Врачи</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Запись на приём</li>
+      </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+      <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm p-4 p-md-5" style="background-color: var(--dl-card-bg); border-radius: var(--dl-radius-card);">
+          <div class="mb-4">
+            <span class="badge bg-primary-subtle text-primary fw-semibold px-3 py-2 rounded-pill mb-2">Онлайн-запись</span>
+            <h1 class="h3 fw-bold mb-1">Запись на стоматологический приём</h1>
+            <p class="text-muted mb-0">
+              Заполните поля формы для бронирования времени. Проверка выполняется на клиенте через Constraint Validation API и повторно на сервере.
+            </p>
+          </div>
+
+          <!-- novalidate: стандартные «пузыри» браузера отключены, валидацию и вывод ошибок выполняет app.js.
+               Сервер проверяет каждое поле заново! -->
+          <form id="appointment-form" method="post" action="/appointments/create" novalidate>
+            <!-- 1. ФИО пациента -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="patient-name">ФИО пациента <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="patient-name" name="patient_name"
+                     placeholder="Например: Саидов Саид Комилович"
+                     required minlength="3" maxlength="60"
+                     aria-describedby="patient-name-error">
+              <div class="invalid-feedback" id="patient-name-error"></div>
+            </div>
+
+            <!-- 2. Контактный телефон -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="patient-phone">Номер телефона <span class="text-danger">*</span></label>
+              <input type="tel" class="form-control" id="patient-phone" name="patient_phone"
+                     placeholder="+992 90 000 0000"
+                     required pattern="[0-9+\(\)\s\-]{5,20}"
+                     aria-describedby="patient-phone-error">
+              <div class="form-text small text-muted">Формат: от 5 до 20 цифр, допускаются символы +, скобки и дефис.</div>
+              <div class="invalid-feedback" id="patient-phone-error"></div>
+            </div>
+
+            <!-- 3. Выбор врача -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="doctor-select">Лечащий врач <span class="text-danger">*</span></label>
+              <select class="form-select" id="doctor-select" name="doctor_id" required aria-describedby="doctor-select-error">
+                <option value="">Выберите специалиста клиники</option>
+                <option value="1">Саид Саидов — Стоматолог-терапевт (Кабинет №1)</option>
+                <option value="2">Рахимов Алишер — Эндодонтист-микроскопист (Кабинет №1)</option>
+                <option value="3">Умаров Джамшед — Хирург-имплантолог, к.м.н. (Кабинет №2)</option>
+                <option value="4">Турсунова Зарина — Врач-ортодонт (Кабинет №3)</option>
+                <option value="5">Бобоев Сино — Детский врач-стоматолог (Кабинет №4)</option>
+                <option value="6">Давлатов Рустам — Стоматолог-гигиенист (Кабинет №2)</option>
+              </select>
+              <div class="invalid-feedback" id="doctor-select-error"></div>
+            </div>
+
+            <!-- 4. Медицинская услуга -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="service-type">Медицинская услуга <span class="text-danger">*</span></label>
+              <select class="form-select" id="service-type" name="service_type" required aria-describedby="service-type-error">
+                <option value="">Выберите услугу</option>
+                <option value="consultation">Первичная консультация и диагностика (бесплатно)</option>
+                <option value="caries">Лечение кариеса и художественная реставрация</option>
+                <option value="endodontics">Лечение корневых каналов под микроскопом</option>
+                <option value="implant">Установка дентального имплантата</option>
+                <option value="hygiene">Профессиональная гигиена полости рта (Air Flow)</option>
+                <option value="braces">Установка и коррекция брекет-системы</option>
+              </select>
+              <div class="invalid-feedback" id="service-type-error"></div>
+            </div>
+
+            <!-- 5 и 6. Диапазон дат (собственное правило checkAppointmentDates) -->
+            <div class="row g-3 mb-3">
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold" for="start-date">Дата начала визита <span class="text-danger">*</span></label>
+                <input class="form-control" type="date" id="start-date" name="start_date" required aria-describedby="start-date-error">
+                <div class="invalid-feedback" id="start-date-error"></div>
+              </div>
+
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold" for="end-date">Дата завершения курса <span class="text-danger">*</span></label>
+                <input class="form-control" type="date" id="end-date" name="end_date" required aria-describedby="end-date-error">
+                <div class="invalid-feedback" id="end-date-error"></div>
+              </div>
+            </div>
+
+            <!-- 7. Жалобы и пожелания (maxlength 255) -->
+            <div class="mb-4">
+              <label class="form-label fw-semibold" for="appointment-notes">Жалобы или примечания к приёму</label>
+              <textarea class="form-control" id="appointment-notes" name="notes" rows="3" maxlength="255"
+                        placeholder="Опишите симптомы (например: острая зубная боль, скол эмали, плановый осмотр)..."
+                        aria-describedby="appointment-notes-error"></textarea>
+              <div class="form-text small text-muted">Максимальная длина — 255 символов.</div>
+              <div class="invalid-feedback" id="appointment-notes-error"></div>
+            </div>
+
+            <!-- Кнопки формы -->
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+              <a href="doctors.html" class="btn btn-outline-secondary rounded-pill px-4">Отмена</a>
+              <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">Записаться на приём</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Подвал сайта -->
+  <footer class="app-footer py-4 mt-auto">
+    <div class="container text-center">
+      <p class="mb-1">© 2026 DentalLink. Клиентская валидация (Constraint Validation API).</p>
+      <p class="mb-0 text-muted small">Лабораторная работа 11: Валидация форм, кастомные правила и a11y.</p>
+    </div>
+  </footer>
+
+  <!-- Bootstrap Bundle JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <!-- Модуль приложения DentalLink -->
+  <script type="module" src="../assets/js/app.js"></script>
+</body>
+</html>

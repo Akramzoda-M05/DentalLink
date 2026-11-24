@@ -186,7 +186,10 @@
               <td data-label="Врач">Саид Саидов</td>
               <td data-label="Кабинет">Кабинет №1 (Терапия)</td>
               <td data-label="Статус"><span class="badge-status-confirmed">Принято</span></td>
-              <td class="text-end cell-actions"><a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="booking.html">Детали</a></td>
+              <td class="text-end cell-actions">
+                <a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="booking.html">Детали</a>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 ms-1" data-delete-url="/appointments/1/delete" data-employee-name="Саид Саидов (Лечение кариеса)">Отменить</button>
+              </td>
             </tr>
             <tr>
               <td data-label="Дата">20.09.2026</td>
@@ -195,7 +198,10 @@
               <td data-label="Врач">Давлатов Рустам Комронович</td>
               <td data-label="Кабинет">Кабинет №2 (Гигиена)</td>
               <td data-label="Статус"><span class="badge rounded-pill bg-secondary">Завершено</span></td>
-              <td class="text-end cell-actions"><a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="booking.html">Детали</a></td>
+              <td class="text-end cell-actions">
+                <a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="booking.html">Детали</a>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 ms-1" data-delete-url="/appointments/2/delete" data-employee-name="Давлатов Рустам (Чистка)">Отменить</button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -211,7 +217,32 @@
     </div>
   </footer>
 
+  <!-- Модальное окно подтверждения отмены/удаления -->
+  <div class="modal fade" id="confirm-delete-modal" tabindex="-1" aria-labelledby="confirm-delete-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border-radius: var(--dl-radius-card);">
+        <div class="modal-header border-bottom-0 pb-0">
+          <h2 class="modal-title h5 fw-bold text-danger" id="confirm-delete-title">Отменить запись к врачу?</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body py-3">
+          <p class="mb-0 text-secondary">
+            Запись <strong id="confirm-delete-name" class="text-dark"></strong> будет безвозвратно отменена. Действие нельзя отменить.
+          </p>
+        </div>
+        <div class="modal-footer border-top-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Назад</button>
+          <form id="confirm-delete-form" method="post" action="#">
+            <button type="submit" class="btn btn-danger rounded-pill px-3 fw-semibold">Подтвердить отмену</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Bootstrap Bundle JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <!-- Модуль приложения DentalLink -->
+  <script type="module" src="../assets/js/app.js"></script>
 </body>
 </html>

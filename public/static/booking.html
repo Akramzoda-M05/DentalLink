@@ -150,21 +150,43 @@
           </div>
         </div>
 
-        <!-- Форма быстрой записи на свободный слот -->
+        <!-- Форма быстрой записи на свободный слот (Валидация через Constraint Validation API) -->
         <div class="mt-4 pt-3 border-top border-secondary-subtle">
           <h3 class="h6 fw-bold mb-3 text-dark">Записаться на свободное время к доктору Саидову</h3>
-          <form action="booking.html" method="get">
+          <form id="booking-form" action="/appointments/create" method="post" novalidate>
             <div class="row g-3">
               <div class="col-12 col-md-4">
-                <label for="booking-patient-name" class="form-label fw-medium mb-1">ФИО пациента</label>
-                <input type="text" class="form-control search-pill bg-white" id="booking-patient-name" name="patient_name" placeholder="Алиев Вали" required>
+                <label for="booking-patient-name" class="form-label fw-medium mb-1">ФИО пациента *</label>
+                <input type="text" class="form-control search-pill bg-white" id="booking-patient-name" name="patient_name" placeholder="Алиев Вали" required minlength="3" maxlength="60" aria-describedby="booking-patient-name-error">
+                <div class="invalid-feedback" id="booking-patient-name-error"></div>
               </div>
               <div class="col-12 col-md-4">
-                <label for="booking-patient-phone" class="form-label fw-medium mb-1">Номер телефона</label>
-                <input type="tel" class="form-control search-pill bg-white" id="booking-patient-phone" name="patient_phone" placeholder="+992 90 000 0000" required>
+                <label for="booking-patient-phone" class="form-label fw-medium mb-1">Номер телефона *</label>
+                <input type="tel" class="form-control search-pill bg-white" id="booking-patient-phone" name="patient_phone" placeholder="+992 90 000 0000" pattern="[0-9+\(\)\s\-]{5,20}" required aria-describedby="booking-patient-phone-error">
+                <div class="invalid-feedback" id="booking-patient-phone-error"></div>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="booking-service-type" class="form-label fw-medium mb-1">Услуга *</label>
+                <select class="form-select search-pill bg-white" id="booking-service-type" name="service_type" required aria-describedby="booking-service-type-error">
+                  <option value="">Выберите услугу</option>
+                  <option value="consultation" selected>Консультация и осмотр</option>
+                  <option value="caries">Лечение кариеса</option>
+                  <option value="endodontics">Эндодонтия</option>
+                </select>
+                <div class="invalid-feedback" id="booking-service-type-error"></div>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="booking-start-date" class="form-label fw-medium mb-1">Дата начала *</label>
+                <input type="date" class="form-control search-pill bg-white" id="booking-start-date" name="start_date" required aria-describedby="booking-start-date-error">
+                <div class="invalid-feedback" id="booking-start-date-error"></div>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="booking-end-date" class="form-label fw-medium mb-1">Дата окончания *</label>
+                <input type="date" class="form-control search-pill bg-white" id="booking-end-date" name="end_date" required aria-describedby="booking-end-date-error">
+                <div class="invalid-feedback" id="booking-end-date-error"></div>
               </div>
               <div class="col-12 col-md-4 d-grid align-self-end">
-                <button type="submit" class="btn-pill-action text-center">Записаться на 10:00</button>
+                <button type="submit" class="btn-pill-action text-center">Записаться на приём</button>
               </div>
             </div>
           </form>
@@ -181,7 +203,32 @@
     </div>
   </footer>
 
+  <!-- Модальное окно подтверждения отмены/удаления -->
+  <div class="modal fade" id="confirm-delete-modal" tabindex="-1" aria-labelledby="confirm-delete-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border-radius: var(--dl-radius-card);">
+        <div class="modal-header border-bottom-0 pb-0">
+          <h2 class="modal-title h5 fw-bold text-danger" id="confirm-delete-title">Отменить запись к врачу?</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body py-3">
+          <p class="mb-0 text-secondary">
+            Запись пациента <strong id="confirm-delete-name" class="text-dark"></strong> будет отменена. Действие нельзя отменить.
+          </p>
+        </div>
+        <div class="modal-footer border-top-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Отмена</button>
+          <form id="confirm-delete-form" method="post" action="#">
+            <button type="submit" class="btn btn-danger rounded-pill px-3 fw-semibold">Отменить запись</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Bootstrap Bundle JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <!-- Модуль приложения DentalLink -->
+  <script type="module" src="../assets/js/app.js"></script>
 </body>
 </html>

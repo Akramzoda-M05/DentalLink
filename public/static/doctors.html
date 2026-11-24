@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Врачи — Каталог специалистов DentalLink</title>
-  <meta name="description" content="Каталог врачей стоматологической клиники DentalLink в фирменных цветах UI-kit.">
+  <meta name="description" content="Каталог врачей стоматологической клиники DentalLink с живым поиском (debounce, fetch) и модальным окном удаления.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
   <link href="../assets/css/app.css" rel="stylesheet">
 </head>
 <body>
-  <!-- Шапка по композиции макета в фирменных цветах DentalLink -->
+  <!-- Шапка DentalLink -->
   <header class="mockup-header">
     <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3">
       <a class="mockup-logo" href="layout.html">
@@ -22,184 +22,220 @@
       </a>
 
       <div class="d-flex flex-wrap align-items-center gap-2">
-        <form class="search-pill-container" role="search" method="get" action="doctors.html">
-          <label for="header-search" class="visually-hidden">Поиск по сайту</label>
-          <input type="search" class="search-pill" id="header-search" name="q" placeholder="Поиск врача...">
-        </form>
         <nav aria-label="Основная навигация" class="d-flex align-items-center gap-2">
           <a href="doctors.html" class="nav-pill-btn active" aria-current="page">Врачи</a>
           <a href="layout.html" class="nav-pill-btn">Записи</a>
-          <a href="login.html" class="nav-pill-btn">Профиль</a>
+          <a href="appointment-form.html" class="nav-pill-btn">Запись на приём</a>
+          <a href="doctor-form.html" class="nav-pill-btn">Новый врач</a>
         </nav>
       </div>
     </div>
   </header>
 
-  <!-- Основное содержимое страницы: Сетка врачей по макету (3 колонки) -->
+  <!-- Основное содержимое страницы -->
   <main class="container py-4">
+    <!-- Верхний заголовок и навигация -->
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
       <div>
-        <h1 class="h3 fw-bold mb-1">Каталог врачей-стоматологов</h1>
-        <p class="text-muted mb-0">Выберите специалиста и удобное время для визита в клинику</p>
+        <nav aria-label="Навигационная цепочка" class="mb-2">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="layout.html" class="text-decoration-none text-primary">Главная</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Врачи и персонал</li>
+          </ol>
+        </nav>
+        <h1 class="h3 fw-bold mb-1">Специалисты клиники DentalLink</h1>
+        <p class="text-muted mb-0">Каталог врачей, живой поиск с debounce (300 мс) и модальное подтверждение удаления</p>
       </div>
-      <span class="badge bg-primary-subtle text-primary fw-semibold px-3 py-2 rounded-pill">6 врачей на смене</span>
+      <div class="d-flex gap-2">
+        <a href="appointment-form.html" class="btn-pill-action text-decoration-none">+ Записаться на приём</a>
+        <a href="doctor-form.html" class="btn btn-outline-primary rounded-pill px-3 py-2 fw-semibold text-decoration-none">+ Добавить врача</a>
+      </div>
     </div>
 
-    <!-- Форма фильтрации (для требований лабораторной работы 10) -->
-    <section class="card card-body mb-4 border-0 shadow-sm" style="background-color: var(--dl-card-bg); border-radius: var(--dl-radius-card);" aria-labelledby="filter-heading">
-      <h2 id="filter-heading" class="visually-hidden">Фильтр врачей</h2>
-      <form method="get" action="doctors.html">
-        <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-5 col-xl-4">
-            <label for="filter-spec" class="form-label fw-medium mb-1">Специализация</label>
-            <select class="form-select search-pill bg-white" id="filter-spec" name="specialization">
-              <option value="">Все направления</option>
-              <option value="therapist">Стоматолог-терапевт</option>
-              <option value="implantologist">Хирург-имплантолог</option>
-              <option value="orthodontist">Врач-ортодонт</option>
-              <option value="pediatric">Детский стоматолог</option>
-              <option value="hygienist">Стоматолог-гигиенист</option>
-            </select>
+    <!-- Блок интерактивного живого поиска (по критерию Лаб. 11) -->
+    <section class="card card-body mb-4 border-0 shadow-sm p-4" style="background-color: var(--dl-card-bg); border-radius: var(--dl-radius-card);" aria-labelledby="live-search-heading">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h2 id="live-search-heading" class="h5 fw-bold mb-0">⚡ Живой поиск врача по базе клиники</h2>
+        <span class="badge bg-primary-subtle text-primary fw-medium px-3 py-2 rounded-pill">Debounce 300 мс · AbortController · Safe DOM textContent</span>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12 col-md-8 col-lg-6">
+          <label for="doctor-search" class="form-label fw-semibold mb-1">Поиск по ФИО, отделению или специализации</label>
+          <div class="position-relative">
+            <input class="form-control form-control-lg search-pill bg-white"
+                   type="search"
+                   id="doctor-search"
+                   name="q"
+                   placeholder="Например: Саид, Рахимов, Хирург..."
+                   autocomplete="off"
+                   data-api="/api/doctors"
+                   aria-describedby="doctor-search-status">
           </div>
-          <div class="col-12 col-md-4 col-xl-3">
-            <label for="filter-exp" class="form-label fw-medium mb-1">Опыт работы</label>
-            <select class="form-select search-pill bg-white" id="filter-exp" name="experience">
-              <option value="">Любой стаж</option>
-              <option value="5">От 5 лет</option>
-              <option value="10">От 10 лет</option>
-              <option value="15">От 15 лет</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3 col-xl-2 d-grid">
-            <button class="btn-pill-action text-center" type="submit">Применить</button>
-          </div>
-        </div>
-      </form>
-    </section>
-
-    <!-- Сетка карточек врачей: 3 точки перелома (col-12 col-md-6 col-xl-4) -->
-    <section aria-labelledby="doctors-grid-heading">
-      <h2 id="doctors-grid-heading" class="visually-hidden">Список карточек врачей</h2>
-      <div class="row g-4">
-        <!-- Врач 1: Саид Саидов -->
-        <div class="col-12 col-md-6 col-xl-4">
-          <article class="doctor-catalog-card">
-            <div class="doctor-photo-placeholder" role="img" aria-label="Фото Саид Саидов">СС</div>
-            <div class="doctor-card-content">
-              <div class="mb-2">
-                <span class="badge-status-confirmed">● Принимает сегодня</span>
-              </div>
-              <h3 class="doctor-name-title">Саид Саидов</h3>
-              <div class="doctor-spec-text">Стоматолог-терапевт</div>
-              <div class="doctor-exp-text">Опыт 10 лет · Кабинет №1</div>
-              <a href="booking.html" class="btn-pill-action">Подробнее</a>
-            </div>
-          </article>
-        </div>
-
-        <!-- Врач 2: Рахимов Алишер Баходурович -->
-        <div class="col-12 col-md-6 col-xl-4">
-          <article class="doctor-catalog-card">
-            <div class="doctor-photo-placeholder" style="background: linear-gradient(135deg, #198754 0%, #20C997 100%);" role="img" aria-label="Фото Рахимов Алишер">АР</div>
-            <div class="doctor-card-content">
-              <div class="mb-2">
-                <span class="badge-status-confirmed">● Принимает сегодня</span>
-              </div>
-              <h3 class="doctor-name-title">Рахимов Алишер</h3>
-              <div class="doctor-spec-text">Эндодонтист, микроскопист</div>
-              <div class="doctor-exp-text">Опыт 12 лет · Кабинет №1</div>
-              <a href="booking.html" class="btn-pill-action">Подробнее</a>
-            </div>
-          </article>
-        </div>
-
-        <!-- Врач 3: Умаров Джамшед Каримович -->
-        <div class="col-12 col-md-6 col-xl-4">
-          <article class="doctor-catalog-card">
-            <div class="doctor-photo-placeholder" style="background: linear-gradient(135deg, #6610F2 0%, #0D6EFD 100%);" role="img" aria-label="Фото Умаров Джамшед">ДУ</div>
-            <div class="doctor-card-content">
-              <div class="mb-2">
-                <span class="badge-status-confirmed">● Принимает сегодня</span>
-              </div>
-              <h3 class="doctor-name-title">Умаров Джамшед</h3>
-              <div class="doctor-spec-text">Хирург-имплантолог, к.м.н.</div>
-              <div class="doctor-exp-text">Опыт 15 лет · Кабинет №2</div>
-              <a href="booking.html" class="btn-pill-action">Подробнее</a>
-            </div>
-          </article>
-        </div>
-
-        <!-- Врач 4: Турсунова Зарина Мурадовна -->
-        <div class="col-12 col-md-6 col-xl-4">
-          <article class="doctor-catalog-card">
-            <div class="doctor-photo-placeholder" style="background: linear-gradient(135deg, #D63384 0%, #FD7E14 100%);" role="img" aria-label="Фото Турсунова Зарина">ЗТ</div>
-            <div class="doctor-card-content">
-              <div class="mb-2">
-                <span class="badge-status-progress">● На приёме</span>
-              </div>
-              <h3 class="doctor-name-title">Турсунова Зарина</h3>
-              <div class="doctor-spec-text">Врач-ортодонт (брекеты)</div>
-              <div class="doctor-exp-text">Опыт 8 лет · Кабинет №3</div>
-              <a href="booking.html" class="btn-pill-action">Подробнее</a>
-            </div>
-          </article>
-        </div>
-
-        <!-- Врач 5: Бобоев Сино Рустамович -->
-        <div class="col-12 col-md-6 col-xl-4">
-          <article class="doctor-catalog-card">
-            <div class="doctor-photo-placeholder" style="background: linear-gradient(135deg, #FFC107 0%, #FD7E14 100%);" role="img" aria-label="Фото Бобоев Сино">СБ</div>
-            <div class="doctor-card-content">
-              <div class="mb-2">
-                <span class="badge-status-confirmed">● Принимает сегодня</span>
-              </div>
-              <h3 class="doctor-name-title">Бобоев Сино</h3>
-              <div class="doctor-spec-text">Детский врач-стоматолог</div>
-              <div class="doctor-exp-text">Опыт 6 лет · Кабинет №4</div>
-              <a href="booking.html" class="btn-pill-action">Подробнее</a>
-            </div>
-          </article>
-        </div>
-
-        <!-- Врач 6: Давлатов Рустам Комронович -->
-        <div class="col-12 col-md-6 col-xl-4">
-          <article class="doctor-catalog-card">
-            <div class="doctor-photo-placeholder" style="background: linear-gradient(135deg, #0DCAF0 0%, #0D6EFD 100%);" role="img" aria-label="Фото Давлатов Рустам">РД</div>
-            <div class="doctor-card-content">
-              <div class="mb-2">
-                <span class="badge-status-confirmed">● Принимает сегодня</span>
-              </div>
-              <h3 class="doctor-name-title">Давлатов Рустам</h3>
-              <div class="doctor-spec-text">Стоматолог-гигиенист</div>
-              <div class="doctor-exp-text">Опыт 5 лет · Кабинет №2</div>
-              <a href="booking.html" class="btn-pill-action">Подробнее</a>
-            </div>
-          </article>
+          <!-- Строка статуса с aria-live="polite" для экранных читалок (озвучит: «Найдено специалистов: 2») -->
+          <p id="doctor-search-status" class="small text-muted mt-2 mb-0" aria-live="polite">
+            Введите текст для мгновенного поиска специалистов…
+          </p>
         </div>
       </div>
     </section>
 
-    <!-- Пагинация Bootstrap с aria-label -->
-    <nav aria-label="Пагинация каталога врачей" class="d-flex flex-column align-items-center mt-5">
-      <ul class="pagination mb-2">
-        <li class="page-item disabled"><span class="page-link rounded-pill px-3 me-1">«</span></li>
-        <li class="page-item active" aria-current="page"><span class="page-link rounded-pill px-3 me-1" style="background-color: var(--dl-primary); border-color: var(--dl-primary);">1</span></li>
-        <li class="page-item"><a class="page-link rounded-pill px-3 me-1 text-dark" href="#">2</a></li>
-        <li class="page-item"><a class="page-link rounded-pill px-3 text-dark" href="#" aria-label="Следующая страница">»</a></li>
-      </ul>
-      <div class="text-muted small">Показано 6 врачей из базы данных seed.sql</div>
-    </nav>
+    <!-- Интерактивная таблица специалистов -->
+    <section class="card border-0 p-4 shadow-sm mb-5" style="background-color: var(--dl-card-bg); border-radius: var(--dl-radius-card);" aria-labelledby="table-heading">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 id="table-heading" class="h5 fw-bold mb-0">Реестр врачебного персонала клиники</h2>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle table-cards mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">ФИО специалиста</th>
+              <th scope="col" class="d-none d-sm-table-cell">Отделение</th>
+              <th scope="col">Специализация</th>
+              <th scope="col" class="d-none d-md-table-cell">Телефон</th>
+              <th scope="col" class="d-none d-lg-table-cell">Дата приёма</th>
+              <th scope="col">Статус</th>
+              <th scope="col" class="text-end cell-actions">Действия</th>
+            </tr>
+          </thead>
+          <!-- Тело таблицы: обновляется через fetch + replaceChildren -->
+          <tbody id="doctors-tbody">
+            <!-- 1. Саид Саидов -->
+            <tr>
+              <td data-label="ФИО"><a href="booking.html" class="fw-bold text-decoration-none text-dark">Саидов Саид Комилович</a></td>
+              <td data-label="Отделение" class="d-none d-sm-table-cell">Терапевтическое отделение</td>
+              <td data-label="Специализация">Главный врач, стоматолог-терапевт</td>
+              <td data-label="Телефон" class="d-none d-md-table-cell">+992 90 000 0001</td>
+              <td data-label="Дата приёма" class="d-none d-lg-table-cell">01.09.2015</td>
+              <td data-label="Статус"><span class="badge-status-confirmed">● Принимает</span></td>
+              <td data-label="Действие" class="text-end cell-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger ms-1 rounded-pill px-3"
+                        data-delete-url="/api/doctors/1/delete"
+                        data-doctor-name="Саидов Саид Комилович"
+                        data-employee-name="Саидов Саид Комилович">Удалить</button>
+              </td>
+            </tr>
+
+            <!-- 2. Рахимов Алишер -->
+            <tr>
+              <td data-label="ФИО"><a href="booking.html" class="fw-bold text-decoration-none text-dark">Рахимов Алишер Баходурович</a></td>
+              <td data-label="Отделение" class="d-none d-sm-table-cell">Терапевтическое отделение</td>
+              <td data-label="Специализация">Врач-эндодонтист, микроскопист</td>
+              <td data-label="Телефон" class="d-none d-md-table-cell">+992 92 700 11 22</td>
+              <td data-label="Дата приёма" class="d-none d-lg-table-cell">15.03.2018</td>
+              <td data-label="Статус"><span class="badge-status-confirmed">● Принимает</span></td>
+              <td data-label="Действие" class="text-end cell-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger ms-1 rounded-pill px-3"
+                        data-delete-url="/api/doctors/2/delete"
+                        data-doctor-name="Рахимов Алишер Баходурович"
+                        data-employee-name="Рахимов Алишер Баходурович">Удалить</button>
+              </td>
+            </tr>
+
+            <!-- 3. Умаров Джамшед -->
+            <tr>
+              <td data-label="ФИО"><a href="booking.html" class="fw-bold text-decoration-none text-dark">Умаров Джамшед Каримович</a></td>
+              <td data-label="Отделение" class="d-none d-sm-table-cell">Хирургическое отделение</td>
+              <td data-label="Специализация">Хирург-имплантолог, к.м.н.</td>
+              <td data-label="Телефон" class="d-none d-md-table-cell">+992 93 500 33 44</td>
+              <td data-label="Дата приёма" class="d-none d-lg-table-cell">20.11.2016</td>
+              <td data-label="Статус"><span class="badge-status-confirmed">● Принимает</span></td>
+              <td data-label="Действие" class="text-end cell-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger ms-1 rounded-pill px-3"
+                        data-delete-url="/api/doctors/3/delete"
+                        data-doctor-name="Умаров Джамшед Каримович"
+                        data-employee-name="Умаров Джамшед Каримович">Удалить</button>
+              </td>
+            </tr>
+
+            <!-- 4. Турсунова Зарина -->
+            <tr>
+              <td data-label="ФИО"><a href="booking.html" class="fw-bold text-decoration-none text-dark">Турсунова Зарина Мурадовна</a></td>
+              <td data-label="Отделение" class="d-none d-sm-table-cell">Ортодонтическое отделение</td>
+              <td data-label="Специализация">Врач-ортодонт высшей категории</td>
+              <td data-label="Телефон" class="d-none d-md-table-cell">+992 98 800 55 66</td>
+              <td data-label="Дата приёма" class="d-none d-lg-table-cell">01.08.2019</td>
+              <td data-label="Статус"><span class="badge-status-progress">● В отпуске</span></td>
+              <td data-label="Действие" class="text-end cell-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger ms-1 rounded-pill px-3"
+                        data-delete-url="/api/doctors/4/delete"
+                        data-doctor-name="Турсунова Зарина Мурадовна"
+                        data-employee-name="Турсунова Зарина Мурадовна">Удалить</button>
+              </td>
+            </tr>
+
+            <!-- 5. Бобоев Сино -->
+            <tr>
+              <td data-label="ФИО"><a href="booking.html" class="fw-bold text-decoration-none text-dark">Бобоев Сино Рустамович</a></td>
+              <td data-label="Отделение" class="d-none d-sm-table-cell">Детское отделение</td>
+              <td data-label="Специализация">Детский врач-стоматолог</td>
+              <td data-label="Телефон" class="d-none d-md-table-cell">+992 91 800 77 88</td>
+              <td data-label="Дата приёма" class="d-none d-lg-table-cell">10.02.2021</td>
+              <td data-label="Статус"><span class="badge-status-confirmed">● Принимает</span></td>
+              <td data-label="Действие" class="text-end cell-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger ms-1 rounded-pill px-3"
+                        data-delete-url="/api/doctors/5/delete"
+                        data-doctor-name="Бобоев Сино Рустамович"
+                        data-employee-name="Бобоев Сино Рустамович">Удалить</button>
+              </td>
+            </tr>
+
+            <!-- 6. Давлатов Рустам -->
+            <tr>
+              <td data-label="ФИО"><a href="booking.html" class="fw-bold text-decoration-none text-dark">Давлатов Рустам Комронович</a></td>
+              <td data-label="Отделение" class="d-none d-sm-table-cell">Отделение профилактики</td>
+              <td data-label="Специализация">Стоматолог-гигиенист</td>
+              <td data-label="Телефон" class="d-none d-md-table-cell">+992 90 111 22 33</td>
+              <td data-label="Дата приёма" class="d-none d-lg-table-cell">18.05.2022</td>
+              <td data-label="Статус"><span class="badge-status-confirmed">● Принимает</span></td>
+              <td data-label="Действие" class="text-end cell-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger ms-1 rounded-pill px-3"
+                        data-delete-url="/api/doctors/6/delete"
+                        data-doctor-name="Давлатов Рустам Комронович"
+                        data-employee-name="Давлатов Рустам Комронович">Удалить</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <!-- Подвал сайта -->
   <footer class="app-footer py-4 mt-auto">
     <div class="container text-center">
       <p class="mb-1">© 2026 DentalLink. Вёрстка по макетам Figma и UI-kit.</p>
-      <p class="mb-0 text-muted small">Лабораторная работа 10: Каталог специалистов в фирменных стилях.</p>
+      <p class="mb-0 text-muted small">Лабораторная работа 11: Живой поиск, безопасный DOM-вывод и модальное подтверждение удаления.</p>
     </div>
   </footer>
 
-  <!-- Bootstrap Bundle JS -->
+  <!-- Модальное окно подтверждения удаления (по критерию Лаб. 11) -->
+  <div class="modal fade" id="confirm-delete-modal" tabindex="-1" aria-labelledby="confirm-delete-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border-radius: var(--dl-radius-card);">
+        <div class="modal-header border-bottom-0 pb-0">
+          <h2 class="modal-title h5 fw-bold text-danger" id="confirm-delete-title">Удалить сотрудника?</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body py-3">
+          <p class="mb-0 text-secondary">
+            Специалист <strong id="confirm-delete-name" class="text-dark"></strong> будет удалён из базы клиники. Действие нельзя отменить.
+          </p>
+        </div>
+        <div class="modal-footer border-top-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Отмена</button>
+          <form id="confirm-delete-form" method="post" action="#">
+            <button type="submit" class="btn btn-danger rounded-pill px-3 fw-semibold">Удалить</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap Bundle JS (содержит window.bootstrap) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <!-- Модуль приложения DentalLink -->
+  <script type="module" src="../assets/js/app.js"></script>
 </body>
 </html>
