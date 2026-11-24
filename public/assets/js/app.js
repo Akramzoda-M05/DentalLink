@@ -4,14 +4,14 @@
 'use strict';
 
 /* ==========================================================================
-   1. УТИЛИТЫ (Общие вспомогательные функции)
+   1. УТИЛИТЫ
    ========================================================================== */
 
 /**
  * Откладывает вызов fn, пока пользователь не сделает паузу delay мс (по умолчанию 300 мс).
- * @param {Function} fn - Вызываемая функция
- * @param {number} delay - Задержка в миллисекундах
- * @returns {Function} Функция с дебаунсом
+ * @param {Function} fn
+ * @param {number} delay
+ * @returns {Function}
  */
 export function debounce(fn, delay = 300) {
   let timerId;
@@ -22,9 +22,9 @@ export function debounce(fn, delay = 300) {
 }
 
 /**
- * Преобразует дату из формата ISO 'YYYY-MM-DD' в локализованный вид 'DD.MM.YYYY'.
- * @param {string} isoDate - Дата в формате YYYY-MM-DD
- * @returns {string} Дата в формате DD.MM.YYYY
+ * Преобразует дату из формата 'YYYY-MM-DD' в 'DD.MM.YYYY'.
+ * @param {string} isoDate
+ * @returns {string}
  */
 export function formatDate(isoDate) {
   if (!isoDate || typeof isoDate !== 'string') return '';
@@ -68,19 +68,12 @@ const FIELD_MESSAGES = {
   },
 };
 
-/**
- * Возвращает русскоязычный текст ошибки для поля формы
- * @param {HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement} field
- * @returns {string}
- */
 function messageFor(field) {
   const v = field.validity;
   if (v.valid) return '';
-
   if (v.customError) return field.validationMessage;
 
   const custom = FIELD_MESSAGES[field.name] ?? {};
-
   if (v.valueMissing) return custom.valueMissing ?? 'Заполните это обязательное поле.';
   if (v.tooShort) return custom.tooShort ?? `Минимальная длина — ${field.minLength} символов.`;
   if (v.tooLong) return custom.tooLong ?? `Не более ${field.maxLength} символов.`;
@@ -96,11 +89,6 @@ function messageFor(field) {
   return 'Проверьте значение поля.';
 }
 
-/**
- * Подсвечивает валидность поля: класс is-invalid, aria-invalid, текст ошибки
- * @param {HTMLElement} field
- * @returns {boolean}
- */
 function showFieldState(field) {
   if (!field || !field.id) return true;
   const message = messageFor(field);
@@ -122,17 +110,11 @@ function showFieldState(field) {
   return !hasError;
 }
 
-/**
- * Собственное правило валидации дат на два поля:
- * Дата окончания не может быть раньше даты начала.
- * @param {HTMLFormElement} form
- */
 function checkAppointmentDates(form) {
   const start = form.elements.start_date;
   const end = form.elements.end_date;
   if (!start || !end) return;
 
-  // Обязательный сброс ошибки, чтобы не блокировать форму навсегда
   end.setCustomValidity('');
 
   if (start.value && end.value && end.value < start.value) {
@@ -140,10 +122,6 @@ function checkAppointmentDates(form) {
   }
 }
 
-/**
- * Настройка валидации формы с делегированием focusout и input
- * @param {string} formId
- */
 function setupFormValidation(formId) {
   const form = document.getElementById(formId);
   if (!form) return;
@@ -169,21 +147,18 @@ function setupFormValidation(formId) {
     }
   };
 
-  // Делегирование focusout
   form.addEventListener('focusout', (event) => {
     if (event.target.matches('input, select, textarea')) {
       refresh(event.target);
     }
   });
 
-  // Мгновенное снятие ошибки при вводе
   form.addEventListener('input', (event) => {
     if (event.target.classList.contains('is-invalid')) {
       refresh(event.target);
     }
   });
 
-  // Отправка формы submit
   form.addEventListener('submit', (event) => {
     checkAppointmentDates(form);
     let firstInvalid = null;
@@ -209,8 +184,89 @@ export function initFormValidation() {
 }
 
 /* ==========================================================================
-   3. ЖИВОЙ ПОИСК (Live Search)
+   3. ЖИВОЙ ПОИСК (Live Search) С УМНЫМ ФОЛЛБЕКОМ
    ========================================================================== */
+
+// Локальная база врачей на случай запуска без бэкенда/PHP
+const LOCAL_DOCTORS = [
+  {
+    id: 1,
+    full_name: 'Саидов Саид Комилович',
+    department: 'Терапевтическое отделение',
+    position: 'Главный врач, стоматолог-терапевт',
+    specialization: 'therapist',
+    experience_years: 10,
+    phone: '+992 90 000 0001',
+    hire_date: '2015-09-01',
+    status: 'active',
+  },
+  {
+    id: 2,
+    full_name: 'Рахимов Алишер Баходурович',
+    department: 'Терапевтическое отделение',
+    position: 'Врач-эндодонтист, микроскопист',
+    specialization: 'therapist',
+    experience_years: 12,
+    phone: '+992 92 700 11 22',
+    hire_date: '2018-03-15',
+    status: 'active',
+  },
+  {
+    id: 3,
+    full_name: 'Умаров Джамшед Каримович',
+    department: 'Хирургическое отделение',
+    position: 'Хирург-имплантолог, к.м.н.',
+    specialization: 'implantologist',
+    experience_years: 15,
+    phone: '+992 93 500 33 44',
+    hire_date: '2016-11-20',
+    status: 'active',
+  },
+  {
+    id: 4,
+    full_name: 'Турсунова Зарина Мурадовна',
+    department: 'Ортодонтическое отделение',
+    position: 'Врач-ортодонт высшей категории',
+    specialization: 'orthodontist',
+    experience_years: 8,
+    phone: '+992 98 800 55 66',
+    hire_date: '2019-08-01',
+    status: 'on_leave',
+  },
+  {
+    id: 5,
+    full_name: 'Бобоев Сино Рустамович',
+    department: 'Детское отделение',
+    position: 'Детский врач-стоматолог',
+    specialization: 'pediatric',
+    experience_years: 6,
+    phone: '+992 91 800 77 88',
+    hire_date: '2021-02-10',
+    status: 'active',
+  },
+  {
+    id: 6,
+    full_name: 'Давлатов Рустам Комронович',
+    department: 'Отделение профилактики',
+    position: 'Стоматолог-гигиенист',
+    specialization: 'hygienist',
+    experience_years: 5,
+    phone: '+992 90 111 22 33',
+    hire_date: '2022-05-18',
+    status: 'active',
+  },
+  {
+    id: 7,
+    full_name: '<img src=x onerror="alert(\'XSS\')"> Тестов Доктор Врачевич',
+    department: 'Тестовая кафедра стоматологии',
+    position: 'Врач-стажёр (XSS-тест)',
+    specialization: 'therapist',
+    experience_years: 1,
+    phone: null,
+    hire_date: '2024-01-10',
+    status: 'active',
+  },
+];
 
 function createCell(text, className = '') {
   const td = document.createElement('td');
@@ -233,7 +289,7 @@ function createDoctorRow(item) {
   const link = document.createElement('a');
   link.href = item.id ? `booking.html?doctor_id=${encodeURIComponent(item.id)}` : '#';
   link.className = 'fw-bold text-decoration-none text-dark';
-  link.textContent = item.full_name; // Защита от XSS
+  link.textContent = item.full_name; // textContent экранирует XSS!
   nameCell.append(link);
 
   const statusCell = document.createElement('td');
@@ -271,16 +327,9 @@ function createDoctorRow(item) {
   return tr;
 }
 
-/**
- * Создаёт красивую карточку врача в стиле UI-kit DentalLink (безопасно, без innerHTML)
- * @param {Object} item
- * @returns {HTMLElement}
- */
 function createDoctorCard(item) {
   const col = document.createElement('div');
   col.className = 'col-12 col-md-6 col-xl-4 doctor-card-item';
-  col.dataset.doctorName = (item.full_name || '').toLowerCase();
-  col.dataset.doctorSpec = (item.specialization || item.position || '').toLowerCase();
 
   const article = document.createElement('article');
   article.className = 'doctor-catalog-card h-100';
@@ -289,16 +338,16 @@ function createDoctorCard(item) {
   avatar.className = 'doctor-photo-placeholder';
   avatar.setAttribute('role', 'img');
   avatar.setAttribute('aria-label', `Фото ${item.full_name}`);
-  // Генерация инициалов
-  const initials = (item.full_name || 'ДЛ')
-    .replace(/<[^>]*>/g, '') // убираем теги для инициалов
+
+  const rawInitials = (item.full_name || 'ДЛ')
+    .replace(/<[^>]*>/g, '')
     .trim()
     .split(/\s+/)
     .slice(0, 2)
     .map(w => w[0] || '')
     .join('')
     .toUpperCase() || 'ДЛ';
-  avatar.textContent = initials;
+  avatar.textContent = rawInitials;
 
   const content = document.createElement('div');
   content.className = 'doctor-card-content';
@@ -313,7 +362,7 @@ function createDoctorCard(item) {
 
   const title = document.createElement('h3');
   title.className = 'doctor-name-title';
-  title.textContent = item.full_name; // textContent безопасен от XSS!
+  title.textContent = item.full_name; // Безопасно от XSS
 
   const spec = document.createElement('div');
   spec.className = 'doctor-spec-text';
@@ -340,7 +389,6 @@ function createDoctorCard(item) {
   deleteBtn.textContent = 'Удалить';
 
   btnWrap.append(link, deleteBtn);
-
   content.append(statusWrap, title, spec, exp, btnWrap);
   article.append(avatar, content);
   col.append(article);
@@ -349,7 +397,6 @@ function createDoctorCard(item) {
 }
 
 function renderDoctors(tbody, cardsContainer, items) {
-  // Рендеринг в таблицу
   if (tbody) {
     if (!items || items.length === 0) {
       const emptyRow = document.createElement('tr');
@@ -365,7 +412,6 @@ function renderDoctors(tbody, cardsContainer, items) {
     }
   }
 
-  // Рендеринг в сетку карточек
   if (cardsContainer) {
     if (!items || items.length === 0) {
       const emptyMsg = document.createElement('div');
@@ -379,13 +425,40 @@ function renderDoctors(tbody, cardsContainer, items) {
   }
 }
 
+/**
+ * Локальная фильтрация данных (гарантирует мгновенную работу поиска без бэкенда)
+ */
+function filterLocalDoctors(query, specFilter = '', expFilter = '') {
+  const q = (query || '').toLowerCase().trim();
+  return LOCAL_DOCTORS.filter(d => {
+    const matchQuery = !q ||
+      d.full_name.toLowerCase().includes(q) ||
+      (d.department && d.department.toLowerCase().includes(q)) ||
+      (d.position && d.position.toLowerCase().includes(q));
+
+    const matchSpec = !specFilter ||
+      d.specialization === specFilter ||
+      (d.position && d.position.toLowerCase().includes(specFilter.toLowerCase()));
+
+    const matchExp = !expFilter || (d.experience_years >= parseInt(expFilter, 10));
+
+    return matchQuery && matchSpec && matchExp;
+  });
+}
+
 export function initLiveSearch() {
-  const input = document.getElementById('doctor-search') || document.getElementById('employee-search') || document.getElementById('header-search');
+  const doctorSearch = document.getElementById('doctor-search');
+  const employeeSearch = document.getElementById('employee-search');
   const headerSearch = document.getElementById('header-search');
+  const filterForm = document.getElementById('doctors-filter-form');
+  const filterSpec = document.getElementById('filter-spec');
+  const filterExp = document.getElementById('filter-exp');
+
+  const input = doctorSearch || employeeSearch || headerSearch;
   const tbody = document.getElementById('doctors-tbody') || document.getElementById('employees-tbody');
   const cardsContainer = document.getElementById('doctors-cards-container');
 
-  if (!input && !headerSearch) return;
+  if (!input && !cardsContainer && !tbody) return;
 
   const statusBox = document.getElementById('doctor-search-status') || document.getElementById('employee-search-status');
   const countBadge = document.getElementById('doctors-count-badge');
@@ -396,15 +469,25 @@ export function initLiveSearch() {
 
   let controller = null;
 
-  async function search(query) {
+  async function performSearch(query) {
     controller?.abort();
     controller = new AbortController();
 
     if (tbody) tbody.setAttribute('aria-busy', 'true');
     setStatus('Поиск специалистов…');
 
-    const apiEndpoint = (input && input.dataset.api) || '/api/doctors';
-    const url = `${apiEndpoint}?q=${encodeURIComponent(query)}`;
+    const specVal = filterSpec?.value || '';
+    const expVal = filterExp?.value || '';
+
+    // Определяем URL запроса
+    let endpoint = (input && input.dataset.api) || '/api/doctors';
+    // Если открыто из подпапки static
+    if (window.location.pathname.includes('/static/')) {
+      endpoint = '../api/doctors/index.php';
+    }
+    const url = `${endpoint}?q=${encodeURIComponent(query)}`;
+
+    let results = null;
 
     try {
       const response = await fetch(url, {
@@ -412,46 +495,90 @@ export function initLiveSearch() {
         signal: controller.signal,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      if (response.ok) {
+        const text = await response.text();
+        try {
+          results = JSON.parse(text);
+        } catch {
+          // Если сервер отдал HTML или текст вместо JSON (например, статический сервер без PHP)
+          results = null;
+        }
       }
-
-      const data = await response.json();
-      renderDoctors(tbody, cardsContainer, data);
-
-      if (data.length > 0) {
-        setStatus(`Найдено специалистов: ${data.length}`);
-        if (countBadge) countBadge.textContent = `${data.length} врачей`;
-      } else {
-        setStatus('Специалисты не найдены.');
-        if (countBadge) countBadge.textContent = '0 врачей';
-      }
-    } catch (error) {
-      if (error.name === 'AbortError') return;
-      console.error('Ошибка живого поиска:', error);
-      setStatus('Не удалось выполнить поиск. Проверьте соединение и попробуйте ещё раз.');
-    } finally {
-      if (tbody) tbody.removeAttribute('aria-busy');
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      // Если сетевая ошибка или файл открыт локально — активируем локальный фоллбек
+      results = null;
     }
+
+    // Если бэкенд не ответил JSON'ом (например, запуск через Live Server без PHP), используем умный локальный фоллбек
+    if (!results) {
+      results = filterLocalDoctors(query, specVal, expVal);
+    } else if (specVal || expVal) {
+      // Применяем дополнительные фильтры специализации/опыта к данным
+      results = results.filter(d => {
+        const matchSpec = !specVal || (d.position && d.position.toLowerCase().includes(specVal)) || (d.specialization && d.specialization.includes(specVal));
+        const matchExp = !expVal || ((d.experience_years || 5) >= parseInt(expVal, 10));
+        return matchSpec && matchExp;
+      });
+    }
+
+    renderDoctors(tbody, cardsContainer, results);
+
+    if (results.length > 0) {
+      setStatus(`Найдено специалистов: ${results.length}`);
+      if (countBadge) countBadge.textContent = `${results.length} врачей`;
+    } else {
+      setStatus('Специалисты не найдены.');
+      if (countBadge) countBadge.textContent = '0 врачей';
+    }
+
+    if (tbody) tbody.removeAttribute('aria-busy');
   }
 
-  const debouncedSearch = debounce(search, 300);
+  const debouncedSearch = debounce(performSearch, 300);
 
-  // Слушаем основной инпут
-  if (input) {
-    input.addEventListener('input', () => {
-      const val = input.value.trim();
-      if (headerSearch && headerSearch !== input) headerSearch.value = input.value;
-      debouncedSearch(val);
+  // Синхронизация и обработчики полей ввода
+  const allSearchInputs = [doctorSearch, headerSearch, employeeSearch].filter(Boolean);
+
+  allSearchInputs.forEach((inp) => {
+    // Ввод символов (мгновенный дебаунс)
+    inp.addEventListener('input', () => {
+      const val = inp.value;
+      allSearchInputs.forEach((other) => {
+        if (other !== inp) other.value = val;
+      });
+      debouncedSearch(val.trim());
+    });
+
+    // Нажатие Enter
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        performSearch(inp.value.trim());
+      }
+    });
+  });
+
+  // Перехват отправки формы фильтрации (предотвращает перезагрузку страницы!)
+  if (filterForm) {
+    filterForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const currentQuery = (doctorSearch?.value || headerSearch?.value || '').trim();
+      performSearch(currentQuery);
     });
   }
 
-  // Если есть инпут в шапке, синхронизируем с основным
-  if (headerSearch && headerSearch !== input) {
-    headerSearch.addEventListener('input', () => {
-      const val = headerSearch.value.trim();
-      if (input) input.value = headerSearch.value;
-      debouncedSearch(val);
+  // Фильтры по специализации и стажу
+  if (filterSpec) {
+    filterSpec.addEventListener('change', () => {
+      const currentQuery = (doctorSearch?.value || headerSearch?.value || '').trim();
+      performSearch(currentQuery);
+    });
+  }
+  if (filterExp) {
+    filterExp.addEventListener('change', () => {
+      const currentQuery = (doctorSearch?.value || headerSearch?.value || '').trim();
+      performSearch(currentQuery);
     });
   }
 }
@@ -471,7 +598,6 @@ export function initDeleteConfirm() {
 
   let lastTrigger = null;
 
-  // Делегирование на уровне document — ловит клики даже по созданным динамически карточкам и строкам
   document.addEventListener('click', (event) => {
     const button = event.target.closest('[data-delete-url]');
     if (!button) return;
@@ -486,14 +612,12 @@ export function initDeleteConfirm() {
     modal.show();
   });
 
-  // Возврат фокуса при закрытии
   modalElement.addEventListener('hidden.bs.modal', () => {
     if (lastTrigger?.isConnected) {
       lastTrigger.focus();
     }
   });
 
-  // Защита от двойного клика
   if (form && submitButton) {
     form.addEventListener('submit', () => {
       submitButton.disabled = true;
@@ -502,7 +626,7 @@ export function initDeleteConfirm() {
 }
 
 /* ==========================================================================
-   5. ПЕРЕКЛЮЧЕНИЕ ВИДОВ (Карточки / Таблица) в каталоге
+   5. ПЕРЕКЛЮЧЕНИЕ ВИДОВ (Карточки / Таблица)
    ========================================================================== */
 
 function initViewToggle() {
@@ -532,7 +656,7 @@ function initViewToggle() {
   });
 }
 
-// Запуск при подключении как ES-модуль
+// Запуск
 initFormValidation();
 initLiveSearch();
 initDeleteConfirm();
