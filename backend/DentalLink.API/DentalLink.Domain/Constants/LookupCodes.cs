@@ -1,4 +1,4 @@
-namespace DentalLink.Domain.Entities;
+namespace DentalLink.Domain.Constants;
 
 public static class LookupCodes
 {

@@ -1,3 +1,4 @@
+using DentalLink.Domain.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,17 +18,35 @@ public sealed class GlobalExceptionHandler(
             return false;
         }
 
-        logger.LogError(exception, "Unhandled request error for {RequestPath}", httpContext.Request.Path);
+        var (statusCode, title, detail, extensions) = MapException(exception);
+
+        if (statusCode >= StatusCodes.Status500InternalServerError)
+        {
+            logger.LogError(exception, "Unhandled server error on {Path}", httpContext.Request.Path);
+        }
+        else
+        {
+            logger.LogWarning(exception, "Client request error ({StatusCode}) on {Path}: {Message}",
+                statusCode, httpContext.Request.Path, exception.Message);
+        }
 
         var problem = new ProblemDetails
         {
-            Status = StatusCodes.Status500InternalServerError,
-            Title = "An unexpected error occurred.",
-            Detail = "The request could not be completed.",
+            Status = statusCode,
+            Title = title,
+            Detail = detail,
             Instance = httpContext.Request.Path
         };
 
-        httpContext.Response.StatusCode = problem.Status.Value;
+        if (extensions != null)
+        {
+            foreach (var (key, value) in extensions)
+            {
+                problem.Extensions[key] = value;
+            }
+        }
+
+        httpContext.Response.StatusCode = statusCode;
         await problemDetailsService.WriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
@@ -35,5 +54,48 @@ public sealed class GlobalExceptionHandler(
         });
 
         return true;
+    }
+
+    private static (int StatusCode, string Title, string Detail, IDictionary<string, object?>? Extensions) MapException(Exception exception)
+    {
+        return exception switch
+        {
+            ValidationException valEx => (
+                StatusCodes.Status400BadRequest,
+                "Validation Error",
+                valEx.Message,
+                new Dictionary<string, object?> { ["errors"] = valEx.Errors }
+            ),
+            NotFoundException notFoundEx => (
+                StatusCodes.Status404NotFound,
+                "Resource Not Found",
+                notFoundEx.Message,
+                null
+            ),
+            ConflictException conflictEx => (
+                StatusCodes.Status409Conflict,
+                "Conflict",
+                conflictEx.Message,
+                null
+            ),
+            UnauthorizedException unauthEx => (
+                StatusCodes.Status401Unauthorized,
+                "Unauthorized",
+                unauthEx.Message,
+                null
+            ),
+            ForbiddenException forbidEx => (
+                StatusCodes.Status403Forbidden,
+                "Forbidden",
+                forbidEx.Message,
+                null
+            ),
+            _ => (
+                StatusCodes.Status500InternalServerError,
+                "Internal Server Error",
+                "An unexpected server error occurred. Please contact clinic administration.",
+                null
+            )
+        };
     }
 }

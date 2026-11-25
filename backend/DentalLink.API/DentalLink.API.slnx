@@ -3,4 +3,5 @@
   <Project Path="DentalLink.Application/DentalLink.Application.csproj" />
   <Project Path="DentalLink.Domain/DentalLink.Domain.csproj" />
   <Project Path="DentalLink.Infrastructure/DentalLink.Infrastructure.csproj" />
+  <Project Path="DentalLink.Tests/DentalLink.Tests.csproj" />
 </Solution>

@@ -1,14 +1,25 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using DentalLink.Application.Common.Behaviors;
+using FluentValidation;
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace DentalLink.Application
+namespace DentalLink.Application;
+
+public static class DependencyInjection
 {
-    public static class DependencyInjection
+    public static IServiceCollection AddApplicationDI(this IServiceCollection services)
     {
-        public static IServiceCollection AddApplicationDI(this IServiceCollection services)
+        var assembly = typeof(DependencyInjection).Assembly;
+
+        services.AddValidatorsFromAssembly(assembly);
+
+        services.AddMediatR(cfg =>
         {
-            services.AddMediatR(configuration =>
-                configuration.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly));
-            return services;
-        }
+            cfg.RegisterServicesFromAssembly(assembly);
+            cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+            cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        });
+
+        return services;
     }
 }
