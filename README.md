@@ -225,3 +225,53 @@ if (!response.ok) {
 ```
 Благодаря этому при кодах 404 или 500 приложение не ломается молча, а корректно переходит в `catch`, где пользователю выводится дружественное уведомление: «Не удалось выполнить поиск. Проверьте соединение и попробуйте ещё раз.».
 
+
+---
+
+## 🏛️ Лабораторная работа 13: Работа с БД: PDO, репозитории, CRUD
+
+В рамках лабораторной работы 13 веб-приложение **DentalLink** переведено на постоянное хранение данных в реляционной СУБД (MySQL / MariaDB / SQLite) через безопасный интерфейс **PDO**. Реализован полноценный архитектурный слой репозиториев (Repository Pattern), пагинация с сохранением фильтров, текстовый поиск с экранированием LIKE, серверная валидация по цепочке правил, паттерн PRG и аналитический отчёт с группировкой и условной агрегацией.
+
+### 📌 Ключевые архитектурные решения
+
+1. **Безопасное подключение PDO (src/Core/Database.php)**:
+   - Строка подключения: mysql:host=127.0.0.1;port=3306;dbname=dentallink_db;charset=utf8mb4.
+   - Настройки:
+     - PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION (любая ошибка SQL вызывает исключение);
+     - PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC (строки как ассоциативные массивы);
+     - PDO::ATTR_EMULATE_PREPARES => false (настоящие подготовленные запросы на стороне СУБД).
+   - Конфигурация: config/config.example.php хранится в Git; боевой файл config/config.php добавлен в .gitignore.
+
+2. **Слой репозиториев (src/Repositories/)**:
+   - DoctorRepository: весь SQL для главной сущности (CRUD, пагинация paginate(), поиск uildWhere(), подсчёт по статусам, проверка уникальности email и телефона, отчёт staffReport()).
+   - SpecializationRepository: работа со справочником медицинских направлений (ll(), ids(), ind()).
+   - CabinetRepository: работа со справочником лечебных кабинетов и кресел (ll(), ids(), ind()).
+   - AppointmentRepository: учёт записей пациентов и проверка ограничений внешнего ключа.
+
+3. **Полный цикл CRUD главной сущности (Врачи-стоматологи)**:
+   - GET /doctors — список врачей с фильтрами, поиском и пагинацией;
+   - GET /doctors/{id} — подробный профиль врача с объединением данных из 2+ справочников (JOIN);
+   - GET /doctors/create и POST /doctors/create — создание врача по схеме PRG (Post/Redirect/Get);
+   - GET /doctors/{id}/edit и POST /doctors/{id}/edit — редактирование с предзаполнением формы;
+   - POST /doctors/{id}/delete — удаление только через POST с проверкой внешних связей (ON DELETE RESTRICT).
+
+4. **Серверная валидация (src/Core/Validator.php)**:
+   - Проверка обязательности, длины строк, формата email, строгого формата и существования даты (checkdate).
+   - Бизнес-правила: минимальный возраст специалиста (не моложе 21 года), дата найма не в будущем, неотрицательный стаж.
+   - Проверка уникальности email и номера телефона прямыми запросами к БД.
+   - При ошибках — статус 422 Unprocessable Entity и повторный вывод формы с подсветкой полей is-invalid.
+
+5. **Аналитический отчёт (GET /reports/staff)**:
+   - Запрос с GROUP BY и условной агрегацией SUM(condition):
+     `sql
+     SELECT s.name AS specialization_name, COUNT(d.id) AS total,
+            COALESCE(SUM(d.status = 'active'), 0) AS active_count,
+            COALESCE(SUM(d.status = 'on_leave'), 0) AS on_leave_count,
+            COALESCE(SUM(d.experience_years >= 10), 0) AS experienced_count
+     FROM doctor_specializations s
+     LEFT JOIN doctors d ON d.specialization_id = s.id AND d.status <> 'dismissed'
+     GROUP BY s.id, s.name;
+     `
+   - Итоговая сводная строка рассчитывается в PHP.
+
+Подробная таблица проверок функциональности и ответы на 6 вопросов к защите приведены в [docs/13-checks.md](docs/13-checks.md).

@@ -131,3 +131,6 @@ coverage/
 # Generated
 ############################################
 Generated/
+# Lab 13 config
+config/config.php
+
