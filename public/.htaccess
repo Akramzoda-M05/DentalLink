@@ -1,0 +1,6 @@
+# Apache (XAMPP): все запросы, которые не являются существующими файлами
+# или папками, отправляем во front controller index.php
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]

@@ -1,0 +1,19 @@
+{
+    "name": "course/dentallink",
+    "description": "Информационная система «Онлайн-запись в стоматологию» DentalLink — учебный проект курса веб-программирования",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2",
+        "ext-pdo": "*",
+        "ext-mbstring": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

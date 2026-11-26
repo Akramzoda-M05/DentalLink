@@ -10,7 +10,7 @@
   <!-- Bootstrap 5.3.3 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- DentalLink UI-kit стили -->
-  <link href="/assets/css/app.css" rel="stylesheet">
+  <link href="<?= $this->url('/assets/css/app.css') ?>" rel="stylesheet">
   <style>
     :root {
       --dl-primary: #0284c7;
@@ -71,7 +71,7 @@
         <a href="<?= $this->url('/doctors') ?>" class="nav-pill-btn <?= (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/doctors') && !str_contains($_SERVER['REQUEST_URI'] ?? '', '/create')) ? 'active' : '' ?>">Врачи</a>
         <a href="<?= $this->url('/doctors/create') ?>" class="nav-pill-btn <?= str_contains($_SERVER['REQUEST_URI'] ?? '', '/create') ? 'active' : '' ?>">+ Добавить врача</a>
         <a href="<?= $this->url('/reports/staff') ?>" class="nav-pill-btn <?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/reports') ? 'active' : '' ?>">Отчёт: Штат</a>
-        <a href="/static/doctors.html" class="nav-pill-btn text-muted" target="_blank">Статика (лаб. 11)</a>
+        <a href="<?= $this->url('/static/doctors.html') ?>" class="nav-pill-btn text-muted" target="_blank" rel="noopener">Статика (лаб. 11)</a>
       </nav>
     </div>
   </header>
@@ -85,6 +85,7 @@
     <div class="container text-center">
       <p class="mb-1"><strong>DentalLink</strong> — Лабораторная работа 13: Работа с БД (PDO, Репозитории, CRUD, Поиск, Пагинация).</p>
       <p class="mb-0 small text-muted">Архитектура MVC, Prepared Statements, PRG-паттерн, строгая типизация PHP 8.2.</p>
+      <?= $this->partial('clinic-hours') ?>
     </div>
   </footer>
 

@@ -11,7 +11,7 @@
             <p class="text-muted mb-4"><?= nl2br($this->e($message)) ?></p>
             <div class="d-flex justify-content-center gap-2">
                 <a href="<?= $this->url('/doctors') ?>" class="btn btn-primary rounded-pill px-4">В каталог врачей</a>
-                <a href="javascript:history.back()" class="btn btn-outline-secondary rounded-pill px-4">Назад</a>
+                <a href="<?= $this->url('/') ?>" class="btn btn-outline-secondary rounded-pill px-4">На главную</a>
             </div>
         </div>
     </div>

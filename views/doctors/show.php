@@ -26,7 +26,7 @@ $st = $statusLabels[$doctor['status']] ?? ['label' => $doctor['status'], 'class'
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <span class="badge <?= $st['class'] ?> rounded-pill px-3 py-1">
-                            <?= $st['label'] ?>
+                            <?= $this->e($st['label']) ?>
                         </span>
                         <span class="badge bg-light text-secondary border rounded-pill px-3 py-1">
                             ID: #<?= (int) $doctor['id'] ?>

@@ -1,0 +1,939 @@
+
+
+========== PAGE 1 ==========
+Лабораторная работа 12. BACKEND (1): Composer, front controller, 
+маршрутизация, шаблоны
+Цель
+Научиться строить серверную часть на PHP 8 без фреймворка по схеме MVC: автозагрузка классов 
+по стандарту PSR-4 через Composer, единая точка входа (front controller), маршрутизатор с 
+параметрами в адресе, контроллеры и шаблоны на «чистом» PHP с экранированием вывода. 
+Результат — статические страницы лаб. 10 превращаются в шаблоны 
+views/
+, а страницы 
+открываются по «красивым» адресам 
+/employees
+, 
+/employees/2
+, 
+/departments
+. Данные пока 
+временные (массивы в контроллерах), база подключится в лаб. 13.
+Время
+2 часа: ~50 мин — часть А с преподавателем; ~70 мин — часть Б самостоятельно.
+ПО
+•
+PHP 8.2+ (XAMPP) и Composer 2 (getcomposer.org, установщик для Windows сам находит 
+C:\xampp\php\php.exe
+). Проверка: 
+php -v
+, 
+composer -V
+.
+•
+Apache из XAMPP с включённым 
+mod_rewrite
+ (в XAMPP включён по умолчанию) или 
+встроенный сервер 
+php -S
+.
+•
+VS Code с расширением PHP Intelephense; curl (есть в Windows 10/11 и в Git Bash).
+Краткая теория
+•
+HTTP-запрос
+ — метод (GET читает, POST изменяет), путь (
+/employees/2
+), строка запроса 
+(
+?q=рах
+), заголовки и тело. 
+Ответ
+ — код состояния (200, 302, 404, 405, 500), заголовки и 
+тело. В PHP метод и адрес лежат в 
+$_SERVER['REQUEST_METHOD']
+ и 
+$_SERVER['REQUEST_URI']
+, параметры — в 
+$_GET
+ и 
+$_POST
+.
+•
+Front controller
+ — все запросы идут в один файл 
+public/index.php
+. Он подключает 
+автозагрузку, описывает таблицу маршрутов и передаёт запрос нужному контроллеру. 
+Папка 
+public/
+ — единственная видимая из браузера (DocumentRoot); 
+src/
+, 
+views/
+, 
+config/
+ снаружи недоступны.
+•
+Маршрутизация
+ — сопоставление «метод + шаблон пути» с методом контроллера. 
+Шаблон 
+/employees/{id}
+ превращается в регулярное выражение 
+#^/employees/(?
+P<id>\d+)$#
+. В проекте нет адресов вида 
+index.php?r=...
+.
+•
+Composer
+ — менеджер зависимостей PHP. В нашем проекте он нужен для двух вещей: 
+автозагрузка PSR-4 (сейчас) и PHPUnit (лаб. 15). 
+PSR-4
+: класс 
+App\Core\Router
+ лежит в 
+файле 
+src/Core/Router.php
+, пространство имён совпадает с папками, имя класса — с 
+именем файла (с учётом регистра!).
+
+
+========== PAGE 2 ==========
+•
+MVC.
+ Контроллер принимает запрос и решает, что показать; модель (в лаб. 13 — 
+репозитории) даёт данные; представление (шаблон) только выводит HTML. В шаблоне нет 
+SQL, в контроллере нет HTML.
+•
+Шаблон на PHP
+: буферизация вывода (
+ob_start()
+ / 
+ob_get_clean()
+) позволяет 
+получить HTML страницы строкой и вставить его в общий макет. Каждое значение из 
+данных выводится через 
+htmlspecialchars()
+ (помощник 
+$this->e()
+) — защита от XSS.
+Подробнее — см. Лекцию 12.
+Часть А. Выполнение на примере university-hr
+Эталон — тег 
+day-12
+ (два коммита: «composer PSR-4 autoload, front controller and Router» и «View,
+ 
+base Controller, layout and page templates»). Добавляется 23 файла; статические страницы и 
+заглушка API остаются на месте.
+1.
+Подготовьте ветку и папки:
+git switch -c practice-12 day-11
+mkdir -p src/Core src/Controllers views/partials views/employees 
+views/departments views/dashboard views/auth views/errors
+2.
+Создайте 
+composer.json
+ в корне проекта и сгенерируйте автозагрузчик. Внешних 
+пакетов пока нет, поэтому достаточно 
+dump-autoload
+ (интернет не нужен):
+{
+    "name": "course/university-hr",
+    "description": "Кадровая информационная система вуза — учебный проект 
+курса веб-программирования",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2",
+        "ext-pdo": "*",
+        "ext-mbstring": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
+composer dump-autoload      # создаст vendor/autoload.php и vendor/composer/
+Создайте 
+.gitignore
+: папка 
+vendor/
+ в Git не хранится, она восстанавливается командой 
+Composer. В эталоне там же сразу указаны будущие 
+config/config.php
+ (пароль БД), 
+.env
+, 
+загруженные фото и служебные файлы IDE:
+/vendor/
+/config/config.php
+
+
+========== PAGE 3 ==========
+.env
+/public/uploads/*
+!/public/uploads/.gitkeep
+.phpunit.cache/
+.phpunit.result.cache
+.idea/
+.vscode/
+3.
+Направьте все запросы в 
+index.php
+.
+ Для Apache (XAMPP) — файл 
+public/.htaccess
+: 
+если запрошенный файл или папка существует (CSS, JS, картинка), Apache отдаёт его сам, 
+иначе вызывает 
+index.php
+. Встроенный сервер 
+php -S
+ делает то же сам и 
+.htaccess
+ не 
+читает. Для Nginx аналог — 
+try_files
+ (лаб. 16).
+# Apache (XAMPP): все запросы, которые не являются существующими файлами
+# или папками, отправляем во front controller index.php
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
+4.
+Напишите front controller 
+public/index.php
+.
+ Обратите внимание на запасной 
+автозагрузчик: проект работает даже без 
+composer dump-autoload
+ (это пригодится на 
+бесплатном хостинге в лаб. 16, где нет Composer).
+<?php
+/**
+ * Front controller — единая точка входа.
+ * Веб-сервер направляет сюда ВСЕ запросы (кроме существующих файлов: CSS, 
+JS, картинок).
+ */
+declare(strict_types=1);
+use App\Controllers\AuthController;
+use App\Controllers\DashboardController;
+use App\Controllers\DepartmentController;
+use App\Controllers\EmployeeController;
+use App\Core\Router;
+define('BASE_PATH', dirname(__DIR__));
+// Автозагрузка классов: App\Core\Router → src/Core/Router.php (стандарт PSR-
+4)
+if (is_file(BASE_PATH . '/vendor/autoload.php')) {
+    require BASE_PATH . '/vendor/autoload.php';
+} else {
+    // Запасной вариант, если не выполнен composer install
+    spl_autoload_register(function (string $class): void {
+        if (str_starts_with($class, 'App\\')) {
+            $file = BASE_PATH . '/src/' . str_replace('\\', '/', 
+substr($class, 4)) . '.php';
+            if (is_file($file)) {
+                require $file;
+            }
+        }
+    });
+}
+
+
+========== PAGE 4 ==========
+$router = new Router();
+$router->get('/login', [AuthController::class, 'showLogin']);
+$router->get('/', [DashboardController::class, 'index']);
+$router->get('/employees', [EmployeeController::class, 'index']);
+$router->get('/employees/{id}', [EmployeeController::class, 'show']);
+$router->get('/departments', [DepartmentController::class, 'index']);
+$router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
+5.
+Напишите маршрутизатор 
+src/Core/Router.php
+ (класс 
+final class Router
+, 
+пространство имён 
+App\Core
+). Методы 
+get()
+ и 
+post()
+ добавляют маршрут в массив 
+$routes
+, а шаблон пути сразу переводится в регулярное выражение:
+/**
+ * '/employees/{id}/edit'  →  '#^/employees/(?P<id>\d+)/edit$#'
+ * Параметры в фигурных скобках — только цифры (идентификаторы).
+ */
+private function toRegex(string $path): string
+{
+    $pattern = preg_replace('#\{(\w+)\}#', '(?P<$1>\d+)', $path);
+    return '#^' . $pattern . '$#';
+}
+Главный метод 
+dispatch()
+ перебирает маршруты. Если путь подошёл, но метод другой — ответ 
+405
+ с заголовком 
+Allow
+; если не подошёл ни один — 
+404
+ со страницей ошибки. Параметры из 
+адреса передаются в метод контроллера числами:
+public function dispatch(string $method, string $uri): void
+{
+    $path = $this->normalizePath($uri);
+    $allowedMethods = [];
+    foreach ($this->routes as $route) {
+        if (!preg_match($route['regex'], $path, $matches)) {
+            continue;
+        }
+        if ($route['method'] !== $method) {
+            $allowedMethods[] = $route['method'];
+            continue;
+        }
+        // Оставляем только именованные параметры: ['id' => '15'] → [15]
+        $params = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
+        $params = array_map('intval', array_values($params));
+        [$class, $action] = $route['handler'];
+        (new $class())->$action(...$params);
+        return;
+    }
+    if ($allowedMethods !== []) {
+        http_response_code(405);
+        header('Allow: ' . implode(', ', array_unique($allowedMethods)));
+        echo '405 Method Not Allowed';
+
+
+========== PAGE 5 ==========
+        return;
+    }
+    http_response_code(404);
+    echo (new View(dirname(__DIR__, 2) . '/views'))->render('errors/error', [
+        'title' => 'Страница не найдена', 'code' => 404,
+        'message' => 'Проверьте адрес или вернитесь на главную.',
+    ]);
+}
+Вспомогательный 
+normalizePath()
+ убирает строку запроса, завершающий слеш и 
+базовый путь
+.
+ 
+Базовый путь вычисляет статический метод 
+basePath()
+ из 
+$_SERVER['SCRIPT_NAME']
+: для 
+php
+ 
+-S localhost:8000 -t public
+ это пустая строка, для XAMPP — 
+/university-hr/public
+. 
+Благодаря этому один и тот же код работает и в корне сайта, и в подпапке.
+public static function basePath(): string
+{
+    $dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+    return rtrim($dir, '/');
+}
+6.
+Напишите шаблонизатор 
+src/Core/View.php
+.
+ Шаблон — обычный 
+.php
+-файл в 
+views/
+.
+ 
+Внутри шаблона 
+$this
+ — объект 
+View
+, поэтому доступны помощники. 
+render()
+ сначала 
+рисует страницу, потом вставляет её в макет как переменную 
+$content
+:
+public function render(string $template, array $data = [], ?string $layout = 
+'layout'): string
+{
+    $content = $this->renderFile($template, $data);
+    if ($layout === null) {
+        return $content;
+    }
+    return $this->renderFile($layout, $data + ['content' => $content]);
+}
+private function renderFile(string $template, array $data): string
+{
+    $file = $this->viewsPath . '/' . $template . '.php';
+    if (!is_file($file)) {
+        throw new RuntimeException("Шаблон не найден: {$template}");
+    }
+    // extract() превращает ['employees' => [...]] в переменную $employees
+    extract($data, EXTR_SKIP);
+    ob_start();
+    require $file;
+    return (string) ob_get_clean();
+}
+/** Экранирование для вывода в HTML — защита от XSS. Используйте при КАЖДОМ 
+выводе данных. */
+public function e(mixed $value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 
+'UTF-8');
+}
+
+
+========== PAGE 6 ==========
+/** Полный адрес с учётом базового пути: url('/employees') → '/university-
+hr/public/employees' */
+public function url(string $path = '/'): string
+{
+    return Router::basePath() . $path;
+}
+Остальные помощники на теге: 
+partial()
+ (фрагмент из 
+views/partials/
+), 
+date()
+ (2026-11-02 
+→ 02.11.2026), 
+label()
+ и 
+labels()
+ — русские подписи для значений ENUM из константы 
+LABELS
+ 
+(
+label('employee_status', 'on_leave')
+ → «В отпуске»), 
+initials()
+ — «Рахимов Фарход» 
+→ «РФ» через 
+mb_substr
+.
+7.
+Напишите базовый контроллер 
+src/Controllers/Controller.php
+ (
+abstract class 
+Controller
+) — общие методы для всех контроллеров. Тип 
+never
+ (PHP 8.1) говорит, что 
+метод завершает скрипт:
+protected function render(string $template, array $data = [], int $status = 
+200, string $layout = 'layout'): void
+{
+    http_response_code($status);
+    echo $this->view->render($template, $data, $layout);
+}
+/** Перенаправление (HTTP 302) — после успешной отправки формы (шаблон PRG) 
+*/
+protected function redirect(string $path): never
+{
+    header('Location: ' . $this->view->url($path));
+    exit;
+}
+/** Ответ в формате JSON (для API) */
+protected function json(array $data, int $status = 200): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+/** Страница ошибки (403, 404, 419) и завершение скрипта */
+protected function abort(int $code, string $message = ''): never { /* … 
+render('errors/error', …) … */ }
+8.
+Напишите контроллеры с временными данными.
+ Ключи массивов совпадают с именами 
+столбцов БД и псевдонимами будущего SQL (
+department_name
+, 
+position_title
+) — в 
+лаб. 13 мы заменим массив на запрос, а шаблоны не изменятся. Фрагмент 
+src/Controllers/EmployeeController.php
+:
+final class EmployeeController extends Controller
+{
+    /** День 12: временные данные в массиве (как будто пришли из БД) */
+    private const DEMO = [
+        2 => ['id' => 2, 'last_name' => 'Рахимов', 'first_name' => 'Фарход', 
+
+
+========== PAGE 7 ==========
+'middle_name' => 'Джамшедович',
+              'birth_date' => '1990-06-21', 'gender' => 'm', 'phone' => '+992
+ 
+92 701 11 02', 'email' => 'f.rahimov@example.tj',
+              'department_name' => 'Кафедра программирования и информационных
+ 
+систем',
+              'faculty_name' => 'Факультет информационных технологий и 
+коммуникаций',
+              'position_title' => 'Старший преподаватель', 'academic_degree' 
+=> 'none',
+              'hire_date' => '2014-09-01', 'status' => 'active', 'photo_path'
+ 
+=> null],
+        // 3 => Хамидова Мунира, 14 => Назарова Мавджуда (on_leave)
+    ];
+    /** GET /employees */
+    public function index(): void
+    {
+        $this->render('employees/index', [
+            'title'       => 'Сотрудники',
+            'active'      => 'employees',
+            'employees'   => array_values(self::DEMO),
+            'departments' => [],
+            'filters'     => ['q' => $_GET['q'] ?? '', 'department_id' => '',
+ 
+'status' => ''],
+            'pagination'  => ['page' => 1, 'pages' => 1, 'total' => 
+count(self::DEMO)],
+            'canEdit'     => false,
+        ]);
+    }
+    /** GET /employees/{id} */
+    public function show(int $id): void
+    {
+        $employee = self::DEMO[$id] ?? null;
+        if ($employee === null) {
+            $this->abort(404, 'Сотрудник не найден');
+        }
+        $this->render('employees/show', [
+            'title' => $employee['last_name'] . ' ' . 
+$employee['first_name'],
+            'active' => 'employees', 'employee' => $employee, 'canEdit' => 
+false,
+        ]);
+    }
+}
+По тому же образцу: 
+DashboardController::index()
+ передаёт числа-заглушки 
+['active' =>
+ 
+44, 'on_leave' => 2, 'pending' => 4, 'departments' => 10]
+, 
+DepartmentController::index()
+ — две кафедры и две должности, 
+AuthController::showLogin()
+ рисует форму входа с отдельным макетом: 
+$this-
+>render('auth/login', [...], 200, 'auth/layout')
+.
+9.
+Перенесите вёрстку в шаблоны.
+ Из 
+public/static/layout.html
+ получается 
+views/layout.php
+: шапка уходит в 
+views/partials/nav.php
+, модалка — в 
+views/partials/confirm-delete-modal.php
+, пагинация — в 
+
+
+========== PAGE 8 ==========
+views/partials/pagination.php
+. Адреса файлов стилей и скриптов строятся через 
+$this->url()
+:
+<?php
+/**
+ * Общий макет всех страниц.
+ * @var \App\Core\View $this
+ * @var string $content  HTML конкретной страницы
+ */
+$active = $active ?? '';
+?>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?= $this->e($title ?? 'Главная') ?> — Кадровая система</title>
+  <!-- шрифт Inter и Bootstrap 5.3.3 — как в лаб. 10 -->
+  <link href="<?= $this->url('/assets/css/app.css') ?>" rel="stylesheet">
+</head>
+<body>
+<?= $this->partial('nav', ['active' => $active]) ?>
+<main class="container py-4">
+  <?= $content ?>
+</main>
+<footer class="app-footer container pb-4 text-center">
+  © <?= date('Y') ?> Учебный проект university-hr · все данные вымышлены
+</footer>
+<?= $this->partial('confirm-delete-modal') ?>
+<!-- bootstrap.bundle.min.js -->
+<script type="module" src="<?= $this->url('/assets/js/app.js') ?>"></script>
+</body>
+</html>
+$content
+ выводится 
+без
+ 
+e()
+: это уже готовый HTML, который собрал наш же шаблон. Всё 
+остальное — только через 
+e()
+. Меню строится из массива, активный пункт определяет 
+переменная 
+$active
+, которую передал контроллер (
+views/partials/nav.php
+):
+<?php
+$items = [
+    'dashboard'   => ['/', 'Главная'],
+    'employees'   => ['/employees', 'Сотрудники'],
+    'departments' => ['/departments', 'Кафедры'],
+];
+?>
+<?php foreach ($items as $key => [$href, $text]): ?>
+  <li class="nav-item">
+    <a class="nav-link<?= $key === $active ? ' active' : '' ?>"
+       <?= $key === $active ? 'aria-current="page"' : '' ?>
+       href="<?= $this->url($href) ?>"><?= $this->e($text) ?></a>
+  </li>
+<?php endforeach; ?>
+
+
+========== PAGE 9 ==========
+В 
+views/employees/index.php
+ строки таблицы из лаб. 10 заменяются циклом. Имя класса 
+статуса берётся прямо из данных, а подпись — из 
+label()
+:
+<tbody id="employees-tbody">
+  <?php foreach ($employees as $e): ?>
+    <?php $fullName = trim($e['last_name'] . ' ' . $e['first_name'] . ' ' . 
+($e['middle_name'] ?? '')); ?>
+    <tr>
+      <td data-label="ФИО">
+        <div class="d-flex align-items-center gap-2">
+          <span class="avatar" aria-hidden="true"><?= $this->e($this-
+>initials($e['last_name'], $e['first_name'])) ?></span>
+          <a href="<?= $this->url('/employees/' . (int) $e['id']) ?>"><?= 
+$this->e($fullName) ?></a>
+        </div>
+      </td>
+      <td data-label="Кафедра"><?= $this->e($e['department_name']) ?></td>
+      <td data-label="Дата приёма" class="d-none d-lg-table-cell"><?= $this-
+>date($e['hire_date']) ?></td>
+      <td data-label="Статус">
+        <span class="badge badge-status status-<?= $this->e($e['status']) ?
+>"><?= $this->e($this->label('employee_status', $e['status'])) ?></span>
+      </td>
+      <!-- … должность, телефон, действия (если $canEdit) … -->
+    </tr>
+  <?php endforeach; ?>
+</tbody>
+<?= $this->partial('pagination', $pagination + ['path' => '/employees', 
+'query' => $filters]) ?>
+Аналогично создайте 
+views/employees/show.php
+, 
+views/departments/index.php
+, 
+views/dashboard/index.php
+, 
+views/errors/error.php
+, 
+views/auth/layout.php
+ и 
+views/auth/login.php
+ (форма 
+method="post"
+ на 
+/login
+; обработчика POST пока нет).
+10.
+Проверьте маршруты.
+ Сначала синтаксис всех PHP-файлов, затем коды ответов (во втором
+ 
+терминале, пока работает сервер):
+php -l src/Core/Router.php        # No syntax errors detected — и так для 
+каждого файла
+php -S localhost:8000 -t public
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/              
+# 200
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/employees     
+# 200
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/employees/2   
+# 200
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/employees/99  
+# 404
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/nope          
+# 404
+curl -s -o /dev/null -w "%{http_code}\n" -X POST 
+http://localhost:8000/employees   # 405
+В Windows (cmd) 
+/dev/null
+ замените на 
+NUL
+. В XAMPP те же страницы открываются по адресу 
+http://localhost/university-hr/public/employees
+; в исходном коде страницы (Ctrl+U) 
+
+
+========== PAGE 10 ==========
+ссылка на стили должна быть 
+/university-hr/public/assets/css/app.css
+ — это работа 
+url()
+ и 
+basePath()
+. Живой поиск по-прежнему обращается к заглушке 
+public/api/employees/index.php
+ и работает только через 
+php -S
+ (см. лаб. 11). Форма входа 
+при отправке даст 405 — маршрут POST 
+/login
+ появится в лаб. 14.
+11.
+Сверьтесь с эталоном.
+ Папка 
+vendor/
+ в сравнение не попадёт — она в 
+.gitignore
+:
+git add -A
+git diff day-12 --stat
+git commit -m "core: composer, front controller, Router, View, шаблоны 
+(практика day-12)"
+Часть Б. Индивидуальное задание
+Постройте каркас серверной части своего проекта по той же схеме. Классы 
+Router
+ и 
+View
+ можно 
+взять из примера как библиотечный код, но на защите вы должны объяснить каждую строку. 
+Контроллеры, данные и шаблоны — свои.
+Требование
+Минимум
+Composer
+composer.json
+ с PSR-4 (
+"App\\": "src/"
+), 
+vendor/
+ в
+ 
+.gitignore
+, 
+composer dump-autoload
+ выполняется без ошибок
+Front controller
+public/index.php
+ + 
+public/.htaccess
+; запасной автозагрузчик; 
+в 
+index.php
+ нет HTML и данных
+Маршруты
+не менее 5 GET-маршрутов, из них минимум 1 с параметром 
+{id}
+; 
+таблица маршрутов совпадает с ТЗ (лаб. 8)
+Ошибки
+страница 404 в общем макете; 405 при неверном методе; 404 для 
+несуществующего 
+{id}
+Шаблоны
+views/layout.php
+ + не менее 4 шаблонов страниц + не менее 2 
+фрагментов в 
+views/partials/
+; вёрстка из лаб. 10 перенесена
+Данные
+временные массивы в контроллерах, ключи = имена столбцов 
+вашего 
+schema.sql
+; не менее 3 записей
+Безопасность
+каждое значение данных в шаблонах выводится через 
+e()
+; все 
+адреса — через 
+url()
+Проверка
+docs/12-routes.txt
+: вывод curl с кодами ответов для всех 
+маршрутов + случаи 404 и 405
+Что сдать
+•
+composer.json
+, 
+.gitignore
+, 
+public/index.php
+, 
+public/.htaccess
+, 
+src/
+, 
+views/
+.
+•
+docs/12-routes.txt
+.
+•
+Тег 
+lab-12
+:
+
+
+========== PAGE 11 ==========
+git add composer.json .gitignore public src views docs/12-routes.txt
+git commit -m "core: front controller, маршруты, шаблоны (lab-12)"
+git tag -a lab-12 -m "Лабораторная работа 12"
+git push origin main --tags
+Критерии оценки
+Критерий
+Баллы
+Composer и PSR-4: классы загружаются без 
+require
+ вручную
+1
+Front controller и маршрутизатор: параметры, 404, 405
+3
+Шаблоны: макет, фрагменты, нет дублирования шапки
+2
+Экранирование вывода, адреса через 
+url()
+, отчёт curl, тег 
+lab-12
+2
+Защита
+2
+Итого
+10
+Контрольные вопросы к защите
+1.
+Что такое front controller? Почему DocumentRoot — папка 
+public/
+, а не корень проекта?
+2.
+Как класс 
+App\Controllers\EmployeeController
+ находится без 
+require
+? Покажите 
+правило PSR-4 в 
+composer.json
+.
+3.
+В какое регулярное выражение превратится маршрут 
+/employees/{id}/edit
+? Что 
+вернёт роутер на 
+/employees/abc
+?
+4.
+Чем ответ 404 отличается от 405? Покажите оба в curl.
+5.
+Зачем 
+ob_start()
+ в 
+View::renderFile()
+? Почему 
+$content
+ выводится без 
+e()
+, а имя 
+сотрудника — через 
+e()
+?
+6.
+Зачем нужен 
+basePath()
+? Что сломается в XAMPP, если писать в шаблонах 
+href="/employees"
+?
+Типичные ошибки
+•
+Имя файла не совпадает с именем класса по регистру (
+router.php
+ и 
+class Router
+). В 
+Windows работает, на Linux-сервере — 
+Class "App\Core\Router" not found
+.
+•
+Забыли 
+namespace App\Core;
+ в начале файла или 
+use
+ в 
+index.php
+.
+•
+После добавления нового пространства имён в 
+composer.json
+ не выполнен 
+composer 
+dump-autoload
+.
+•
+В XAMPP все страницы, кроме главной, дают 404 Apache (а не нашу страницу): нет 
+public/.htaccess
+ или не включён 
+mod_rewrite
+.
+•
+Проект открыт в XAMPP по адресу 
+http://localhost/university-hr/
+ — видно 
+содержимое папки проекта вместо сайта. До лаб. 16 работаем через 
+/university-hr/public/
+; в лаб. 16 корневой 
+.htaccess
+ закроет код проекта.
+•
+Адреса в шаблонах написаны вручную (
+href="/employees"
+) — в подпапке XAMPP ссылки
+ 
+ведут в корень 
+localhost
+.
+
+
+========== PAGE 12 ==========
+•
+Данные выведены как 
+<?= $e['last_name'] ?>
+ без 
+e()
+ — в лаб. 15 тест на XSS это 
+найдёт.
+•
+Пробел или BOM перед 
+<?php
+ в классе — позже 
+header()
+ и 
+session_start()
+ выдадут 
+«headers already sent». Сохраняйте файлы в UTF-8 без BOM.

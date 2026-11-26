@@ -1,0 +1,52 @@
+DentalLink — лабораторная работа 12: front controller, Router и View
+====================================================================
+
+Проверка выполнена 26.11.2026 на PHP 8.2.26, встроенный сервер:
+  php -S 127.0.0.1:8012 -t public
+
+База для проверки: локальная SQLite из config/config.php.
+Команда для каждого GET: curl.exe -sS -o NUL -w "%{http_code} METHOD PATH\n" URL
+
+Фактический вывод curl для всех GET-маршрутов:
+
+  302 GET /
+  200 GET /doctors
+  200 GET /doctors/create
+  200 GET /doctors/2
+  200 GET /doctors/2/edit
+  200 GET /employees
+  200 GET /employees/create
+  200 GET /employees/2
+  200 GET /employees/2/edit
+  200 GET /reports/staff
+  200 GET /reports/doctors
+
+Проверка ошибок:
+
+  404 GET /this-route-does-not-exist
+  404 GET /doctors/999999
+  405 PUT /doctors/create
+  Allow: GET, POST
+
+Команды воспроизведения (PowerShell; DocumentRoot уже задан как public/):
+
+  $base = 'http://127.0.0.1:8012'
+  $paths = @('/', '/doctors', '/doctors/create', '/doctors/2', '/doctors/2/edit',
+    '/employees', '/employees/create', '/employees/2', '/employees/2/edit',
+    '/reports/staff', '/reports/doctors', '/this-route-does-not-exist', '/doctors/999999')
+  foreach ($path in $paths) {
+    curl.exe -sS -o NUL -w "%{http_code} GET $path`n" "$base$path"
+  }
+  curl.exe -sS -X PUT -D - -o NUL "$base/doctors/create"
+
+Apache/XAMPP: DocumentRoot должен указывать на public/. Если проект открыт как
+http://localhost/DentalLink/public, используйте этот адрес вместо BASE URL выше.
+
+Результаты подтверждают: неизвестный путь и ID обрабатываются как 404 в общем
+макете, неверный HTTP-метод возвращает 405 и заголовок Allow. Профиль врача
+успешно загружается после удаления ненужной зависимости выборки приёмов от
+таблицы patients: appointments содержит patient_name и patient_phone.
+
+Composer не установлен в проверочном окружении, поэтому composer dump-autoload
+здесь запустить нельзя. Composer-конфигурация содержит PSR-4 App\\ → src/;
+проверенные запросы обслуживались запасным PSR-4 автозагрузчиком из front controller.

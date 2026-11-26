@@ -4,20 +4,27 @@ declare(strict_types=1);
 
 define('BASE_PATH', dirname(__DIR__));
 
-// PSR-4 автозагрузка классов пространства App\ -> src/
-spl_autoload_register(function (string $class): void {
-    $prefix = 'App\\';
-    if (!str_starts_with($class, $prefix)) {
-        return;
-    }
-    $relative = substr($class, strlen($prefix));
-    $file = BASE_PATH . '/src/' . str_replace('\\', '/', $relative) . '.php';
-    if (is_file($file)) {
-        require_once $file;
-    }
-});
+// Composer — основной PSR-4 загрузчик; fallback сохраняет запуск без vendor/.
+$composerAutoload = BASE_PATH . '/vendor/autoload.php';
+if (is_file($composerAutoload)) {
+    require $composerAutoload;
+} else {
+    spl_autoload_register(static function (string $class): void {
+        $prefix = 'App\\';
+        if (!str_starts_with($class, $prefix)) {
+            return;
+        }
+
+        $relative = substr($class, strlen($prefix));
+        $file = BASE_PATH . '/src/' . str_replace('\\', '/', $relative) . '.php';
+        if (is_file($file)) {
+            require_once $file;
+        }
+    });
+}
 
 use App\Controllers\DoctorController;
+use App\Controllers\HomeController;
 use App\Controllers\ReportController;
 use App\Core\Database;
 use App\Core\Router;
@@ -48,10 +55,7 @@ set_exception_handler(function (Throwable $e) use ($config): void {
 $router = new Router();
 
 // Главная перенаправляет в каталог врачей
-$router->get('/', function (): void {
-    header('Location: /doctors');
-    exit;
-});
+$router->get('/', [HomeController::class, 'index']);
 
 // CRUD главной сущности (doctors)
 $router->get('/doctors', [DoctorController::class, 'index']);

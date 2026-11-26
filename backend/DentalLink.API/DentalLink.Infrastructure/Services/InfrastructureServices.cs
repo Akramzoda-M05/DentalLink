@@ -92,10 +92,7 @@ public class JwtTokenService : IJwtTokenService
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Name, user.FullName),
-            new(ClaimTypes.Role, user.Role.Code),
-            new("roleName", user.Role.Name),
-            new("phone", user.Phone)
+            new(ClaimTypes.Name, user.Name)
         };
 
         //if (user.DoctorProfile != null)

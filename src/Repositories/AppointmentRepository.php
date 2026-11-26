@@ -29,12 +29,13 @@ final class AppointmentRepository
      */
     public function allByDoctor(int $doctorId): array
     {
+        // В таблице appointments уже хранится снимок ФИО и телефона пациента.
+        // Это также работает с учебной SQLite-схемой, где таблицы patients может не быть.
         $stmt = $this->db->prepare('
-            SELECT a.*, p.full_name AS patient_full_name
-            FROM appointments a
-            LEFT JOIN patients p ON p.id = a.patient_id
-            WHERE a.doctor_id = :doctor_id
-            ORDER BY a.appointment_date DESC
+            SELECT *
+            FROM appointments
+            WHERE doctor_id = :doctor_id
+            ORDER BY appointment_date DESC
         ');
         $stmt->execute([':doctor_id' => $doctorId]);
         return $stmt->fetchAll();
